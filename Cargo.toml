@@ -16,6 +16,7 @@
 members = [
   "zrpc",
   "zrpc-macros",
+  "znrpc-macros",
 ]
 
 exclude = [

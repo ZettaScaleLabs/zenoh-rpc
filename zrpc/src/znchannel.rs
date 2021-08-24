@@ -17,6 +17,7 @@ extern crate serde;
 use async_std::sync::Arc;
 use futures::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
+use zenoh::net::ReplyReceiver;
 use std::marker::PhantomData;
 use uuid::Uuid;
 
@@ -64,7 +65,7 @@ where
         &self,
         zsession: &zenoh::net::Session,
         request: &Req,
-    ) -> ZRPCResult<async_std::channel::Receiver<zenoh::net::Reply>> {
+    ) -> ZRPCResult<ReplyReceiver> {
         let req = serialize::serialize_request(&request)?;
         let selector = format!("{}{}/eval", self.path, self.server_uuid.unwrap(),);
         let predicate = base64::encode(req).to_string();

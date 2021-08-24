@@ -59,7 +59,7 @@ where
     /// it serialized the request on the as properties in the selector
     /// the request is first serialized as json and then encoded in base64 and
     /// passed as a property named req
-    async fn send(&self, ws: zenoh::Workspace<'_>, request: &Req) -> ZRPCResult<zenoh::DataStream> {
+    async fn send(&self, ws: zenoh::Workspace<'_>, request: &Req) -> ZRPCResult<zenoh::DataReceiver> {
         let req = serialize::serialize_request(&request)?;
         let selector = zenoh::Selector::try_from(format!(
             "{}/{}/eval?(req={})",
@@ -76,9 +76,9 @@ where
     /// if the value is not deserializable or the eval returns none it returns an IOError
     pub async fn call_fun(&self, request: Req) -> ZRPCResult<Resp> {
         let ws = self.z.workspace(None).await?;
-        let mut data_stream = self.send(ws, &request).await?;
+        let mut data_receiver = self.send(ws, &request).await?;
         //takes only one, eval goes to only one
-        let resp = data_stream.next().await;
+        let resp = data_receiver.next().await;
         log::trace!("Response from zenoh is {:?}", resp);
         if let Some(data) = resp {
             let value = data.value;

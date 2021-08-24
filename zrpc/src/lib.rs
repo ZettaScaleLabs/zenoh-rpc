@@ -10,7 +10,7 @@
 * Contributors:
 *   ADLINK fog05 team, <fog05@adlink-labs.tech>
 *********************************************************************************/
-#![feature(associated_type_bounds)]
+//#![feature(associated_type_bounds)]
 #![allow(clippy::upper_case_acronyms)]
 
 pub mod zchannel;

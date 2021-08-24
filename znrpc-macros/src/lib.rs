@@ -667,7 +667,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                 log::trace!("Queryable registered on {:?}", path);
                                 let rcv_loop = async {
                                     loop{
-                                        let query = queryable.stream().next().await.ok_or_else(|| async_std::channel::RecvError)?;
+                                        let query = queryable.receiver().next().await.ok_or_else(|| async_std::channel::RecvError)?;
                                         let ci = state.read().await;
                                         let data = zrpc::serialize::serialize_state(&*ci).map_err(|_| async_std::channel::RecvError)?;
                                         drop(ci);
@@ -676,6 +676,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                             res_name: path.to_string().clone(),
                                             payload: data.into(),
                                             data_info: Some(zenoh::net::protocol::proto::DataInfo {
+                                                sliced: false,
                                                 source_id: None,
                                                 source_sn: None,
                                                 first_router_id: None,
@@ -689,7 +690,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                             }),
                                         };
                                         log::trace!("Reply to state queryable!");
-                                        query.reply(sample).await;
+                                        query.reply(sample);
                                     }
                                 };
                                 log::trace!("Receiver loop started");
@@ -824,7 +825,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                 _barrier.wait().await;
                                 let rcv_loop = async {
                                     loop {
-                                        let query = queryable.stream().next().await.ok_or_else(|| async_std::channel::RecvError)?;
+                                        let query = queryable.receiver().next().await.ok_or_else(|| async_std::channel::RecvError)?;
                                         log::trace!("Received query {:?}", query);
                                         //let base64_req = get_request.selector.properties.get("req").cloned().ok_or_else(|| async_std::channel::RecvError)?;
                                         let base64_req = query.predicate.clone();
@@ -848,6 +849,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                                         res_name: p.to_string().clone(),
                                                         payload: encoded.into(),
                                                         data_info: Some(zenoh::net::protocol::proto::DataInfo {
+                                                            sliced: false,
                                                             source_id: None,
                                                             source_sn: None,
                                                             first_router_id: None,
@@ -860,7 +862,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                                             encoding: None,
                                                         }),
                                                     };
-                                                    query.reply(sample).await;
+                                                    query.reply(sample);
                                                     log::trace!("Response {:?} sent", resp);
                                                 }
                                             )*

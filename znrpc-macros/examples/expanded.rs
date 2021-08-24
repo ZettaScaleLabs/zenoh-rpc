@@ -1,7 +1,7 @@
-#![feature(prelude_import)]
+// #![feature(prelude_import)]
 #![allow(clippy::manual_async_fn)]
 #![allow(clippy::large_enum_variant)]
-#[prelude_import]
+// #[prelude_import]
 extern crate serde;
 extern crate std;
 
@@ -131,7 +131,7 @@ where
                 let rcv_loop = async {
                     loop {
                         let query = queryable
-                            .stream()
+                            .receiver()
                             .next()
                             .await
                             .ok_or_else(|| async_std::channel::RecvError)?;
@@ -143,6 +143,7 @@ where
                             res_name: path.to_string().clone(),
                             payload: data.into(),
                             data_info: Some(zenoh::net::protocol::proto::DataInfo {
+                                sliced: false,
                                 source_id: None,
                                 source_sn: None,
                                 first_router_id: None,
@@ -156,7 +157,8 @@ where
                             }),
                         };
 
-                        query.reply(sample).await;
+                        // query.reply(sample).await;
+                        query.reply(sample);
                     }
                 };
 
@@ -297,7 +299,8 @@ where
                     let rcv_loop = async {
                         loop {
                             let query = queryable
-                                .stream()
+                                // .stream()
+                                .receiver()
                                 .next()
                                 .await
                                 .ok_or_else(|| async_std::channel::RecvError)?;
@@ -320,6 +323,7 @@ where
                                         res_name: p.to_string().clone(),
                                         payload: encoded.into(),
                                         data_info: Some(zenoh::net::protocol::proto::DataInfo {
+                                            sliced: false,
                                             source_id: None,
                                             source_sn: None,
                                             first_router_id: None,
@@ -332,7 +336,8 @@ where
                                             encoding: None,
                                         }),
                                     };
-                                    query.reply(sample).await;
+                                    // query.reply(sample).await;
+                                    query.reply(sample);
                                 }
                                 HelloRequest::Add {} => {
                                     let resp = HelloResponse::Add(ser.add().await);
@@ -342,6 +347,7 @@ where
                                         res_name: p.to_string().clone(),
                                         payload: encoded.into(),
                                         data_info: Some(zenoh::net::protocol::proto::DataInfo {
+                                            sliced: false,
                                             source_id: None,
                                             source_sn: None,
                                             first_router_id: None,
@@ -354,7 +360,8 @@ where
                                             encoding: None,
                                         }),
                                     };
-                                    query.reply(sample).await;
+                                    // query.reply(sample).await;
+                                    query.reply(sample);
                                 }
                             }
                         }
