@@ -13,7 +13,7 @@
 //
 use async_std::stream::StreamExt;
 use async_std::sync::{Arc, Barrier, Mutex};
-use async_std::channel::{unbounded, Sender, Receiver};
+use async_std::channel::{unbounded};
 use async_std::task;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -96,12 +96,12 @@ async fn main() {
         // Wait for the both publishers and subscribers to be declared
         c_barrier.wait().await;
         println!("SQ_NUMBER,SIZE,RTT_US,SCENARIO");
-        while let Some(mut sample) = sub.stream().next().await {
+        while let Some(mut sample) = sub.receiver().next().await {
             let mut count_bytes = [0u8; 8];
             sample.payload.read_bytes(&mut count_bytes);
             let count = u64::from_le_bytes(count_bytes);
             let instant = c_pending.lock().await.remove(&count).unwrap();
-            s.send((count,sample.payload.len(),instant.elapsed().as_micros())).await;
+            s.send((count,sample.payload.len(),instant.elapsed().as_micros())).await.unwrap();
             //print!("{},{},{},{}\n", count,sample.payload.len(),instant.elapsed().as_micros(),scenario);
         }
     });
@@ -141,7 +141,7 @@ async fn main() {
         data.write_bytes(&count_bytes);
         data.write_bytes(&payload);
 
-        let data: RBuf = data.into();
+        let data: ZBuf = data.into();
 
         pending.lock().await.insert(count, Instant::now());
         session

@@ -37,7 +37,7 @@ async fn main() {
     );
     let _publ = session.declare_publisher(&reskey).await.unwrap();
 
-    let data: RBuf = (0usize..(args.size as usize))
+    let data: ZBuf = (0usize..(args.size as usize))
         .map(|_| 0 as u8)
         .collect::<Vec<u8>>()
         .into();

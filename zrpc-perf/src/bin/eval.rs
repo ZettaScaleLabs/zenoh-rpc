@@ -34,6 +34,6 @@ async fn main() {
     let data: Vec<u8> = vec![0; args.size as usize];
     let mut get_stream = ws.register_eval(&path.into()).await.unwrap();
     while let Some(get_request) = get_stream.next().await {
-        get_request.reply(path.clone(), data.clone().into()).await;
+        get_request.reply(path.clone(), data.clone().into());
     }
 }

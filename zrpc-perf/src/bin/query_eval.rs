@@ -1,4 +1,4 @@
-#![feature(integer_atomics)]
+// #![feature(integer_atomics)]
 
 use async_std::sync::Arc;
 use async_std::task;

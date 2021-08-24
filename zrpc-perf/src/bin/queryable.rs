@@ -46,6 +46,7 @@ async fn main() {
             res_name: "/test/eval".into(),
             payload: data.into(),
             data_info: Some(DataInfo {
+                sliced: false,
                 source_id: None,
                 source_sn: None,
                 first_router_id: None,
@@ -60,11 +61,10 @@ async fn main() {
         };
         loop {
             select!(
-                query = queryable.stream().next().fuse() => {
+                query = queryable.receiver().next().fuse() => {
                     let q = query.unwrap();
                     q
-                    .reply(sample.clone())
-                    .await;
+                    .reply(sample.clone());
                 }
             );
         }

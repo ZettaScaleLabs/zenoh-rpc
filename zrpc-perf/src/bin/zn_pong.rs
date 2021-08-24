@@ -49,7 +49,7 @@ async fn main() {
         .declare_subscriber(&reskey_ping, &sub_info)
         .await
         .unwrap();
-    while let Some(sample) = sub.stream().next().await {
+    while let Some(sample) = sub.receiver().next().await {
         session
             .write_ext(
                 &reskey_pong,
