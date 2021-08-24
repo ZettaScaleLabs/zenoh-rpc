@@ -1,12 +1,12 @@
 #![allow(clippy::manual_async_fn)]
 #![allow(clippy::large_enum_variant)]
-#![feature(libstd_sys_internals)]
-#![feature(print_internals)]
-#![feature(fmt_internals)]
-#![feature(prelude_import)]
-#![feature(async_closure)]
-#![feature(associated_type_bounds)]
-#[prelude_import]
+// #![feature(libstd_sys_internals)]
+// #![feature(print_internals)]
+// #![feature(fmt_internals)]
+// #![feature(prelude_import)]
+// #![feature(async_closure)]
+// #![feature(associated_type_bounds)]
+// #[prelude_import]
 #[macro_use]
 extern crate std;
 extern crate base64;
@@ -336,7 +336,7 @@ where
                                                             .map_err(|_| {
                                                                 async_std::channel::RecvError
                                                             })?;
-                                                    gr.reply(p, encoded.into()).await;
+                                                    gr.reply(p, encoded.into());
                                                 }
                                                 HelloRequest::Add => {
                                                     let resp = HelloResponse::Add(ser.add());
@@ -345,7 +345,7 @@ where
                                                             .map_err(|_| {
                                                                 async_std::channel::RecvError
                                                             })?;
-                                                    gr.reply(p, encoded.into()).await;
+                                                    gr.reply(p, encoded.into());
                                                 }
                                             }
                                         }
@@ -648,9 +648,7 @@ impl HelloClient {
                             Ok(r) => match r {
                                 Ok(zr) => match zr {
                                     HelloResponse::Hello(msg) => Ok(msg),
-                                    _ => ::std::rt::begin_panic(
-                                        "internal error: entered unreachable code",
-                                    ),
+                                    _ => unreachable!(),
                                 },
                                 Err(e) => Err(e),
                             },
@@ -678,9 +676,7 @@ impl HelloClient {
                             Ok(r) => match r {
                                 Ok(zr) => match zr {
                                     HelloResponse::Add(msg) => Ok(msg),
-                                    _ => ::std::rt::begin_panic(
-                                        "internal error: entered unreachable code",
-                                    ),
+                                    _ => unreachable!(),
                                 },
                                 Err(e) => Err(e),
                             },

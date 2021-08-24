@@ -851,7 +851,7 @@ impl<'a> ZServiceGenerator<'a> {
                                                                     let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*));
                                                                     log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
                                                                     let encoded =  zrpc::serialize::serialize_response(&resp).map_err(|_| async_std::channel::RecvError)?;
-                                                                    gr.reply(p, encoded.into()).await;
+                                                                    gr.reply(p, encoded.into());
                                                                     log::trace!("Response {:?} sent", resp);
                                                                 }
                                                             )*
