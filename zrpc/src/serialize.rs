@@ -63,7 +63,7 @@ where
     return Ok(bincode::deserialize::<T>(&raw_data)?);
 
     #[cfg(feature = "resp_cbor")]
-    return Ok(serde_cbor::from_slice::<T>(&raw_data)?);
+    return Ok(serde_cbor::from_slice::<T>(raw_data)?);
 
     #[cfg(feature = "resp_json")]
     return Ok(serde_json::from_str::<T>(std::str::from_utf8(raw_data)?)?);
@@ -101,7 +101,7 @@ where
     return Ok(bincode::deserialize::<T>(&raw_data)?);
 
     #[cfg(feature = "state_cbor")]
-    return Ok(serde_cbor::from_slice::<T>(&raw_data)?);
+    return Ok(serde_cbor::from_slice::<T>(raw_data)?);
 
     #[cfg(feature = "state_json")]
     return Ok(serde_json::from_str::<T>(std::str::from_utf8(raw_data)?)?);
@@ -139,7 +139,7 @@ where
     return Ok(serde_json::from_str::<T>(std::str::from_utf8(raw_data)?)?);
 
     #[cfg(feature = "send_cbor")]
-    return Ok(serde_cbor::from_slice::<T>(&raw_data)?);
+    return Ok(serde_cbor::from_slice::<T>(raw_data)?);
 }
 
 pub fn deserialize_router_info(raw_data: &[u8]) -> ZRPCResult<ZRouterInfo> {

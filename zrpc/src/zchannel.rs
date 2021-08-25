@@ -59,7 +59,11 @@ where
     /// it serialized the request on the as properties in the selector
     /// the request is first serialized as json and then encoded in base64 and
     /// passed as a property named req
-    async fn send(&self, ws: zenoh::Workspace<'_>, request: &Req) -> ZRPCResult<zenoh::DataReceiver> {
+    async fn send(
+        &self,
+        ws: zenoh::Workspace<'_>,
+        request: &Req,
+    ) -> ZRPCResult<zenoh::DataReceiver> {
         let req = serialize::serialize_request(&request)?;
         let selector = zenoh::Selector::try_from(format!(
             "{}/{}/eval?(req={})",
@@ -147,7 +151,7 @@ where
                 match &rv.value {
                     zenoh::Value::Json(sv) => {
                         log::trace!("Size of Zenoh router state is {}", sv.len());
-                        let ri = serde_json::from_str::<super::types::ZRouterInfo>(&sv)?;
+                        let ri = serde_json::from_str::<super::types::ZRouterInfo>(sv)?;
                         let mut it = ri.sessions.iter();
                         let f = it.find(|&x| x.peer == String::from(&cs.peerid).to_uppercase());
 
@@ -156,21 +160,21 @@ where
                         }
 
                         match cs.status {
-                            super::ComponentStatus::SERVING => return Ok(true),
-                            _ => return Ok(false),
+                            super::ComponentStatus::SERVING => Ok(true),
+                            _ => Ok(false),
                         }
                     }
                     _ => {
-                        return Err(ZRPCError::ZenohError(
+                        Err(ZRPCError::ZenohError(
                             "Router information is not encoded in JSON".to_string(),
-                        ));
+                        ))
                     }
                 }
             }
             _ => {
-                return Err(ZRPCError::ZenohError(
+                Err(ZRPCError::ZenohError(
                     "Component state is expected to be RAW in Zenoh!!".to_string(),
-                ));
+                ))
             }
         }
     }

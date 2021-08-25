@@ -148,10 +148,11 @@ where
                                 source_sn: None,
                                 first_router_id: None,
                                 first_router_sn: None,
-                                timestamp: Some(uhlc::Timestamp::new(
-                                    Default::default(),
-                                    uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                )),
+                                timestamp: None,
+                                // timestamp: Some(uhlc::Timestamp::new(
+                                //     Default::default(),
+                                //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
+                                // )),
                                 kind: None,
                                 encoding: None,
                             }),
@@ -328,10 +329,11 @@ where
                                             source_sn: None,
                                             first_router_id: None,
                                             first_router_sn: None,
-                                            timestamp: Some(uhlc::Timestamp::new(
-                                                Default::default(),
-                                                uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                            )),
+                                            timestamp: None,
+                                            // timestamp: Some(uhlc::Timestamp::new(
+                                            //     Default::default(),
+                                            //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
+                                            // )),
                                             kind: None,
                                             encoding: None,
                                         }),
@@ -352,10 +354,11 @@ where
                                             source_sn: None,
                                             first_router_id: None,
                                             first_router_sn: None,
-                                            timestamp: Some(uhlc::Timestamp::new(
-                                                Default::default(),
-                                                uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                            )),
+                                            timestamp: None,
+                                            // timestamp: Some(uhlc::Timestamp::new(
+                                            //     Default::default(),
+                                            //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
+                                            // )),
                                             kind: None,
                                             encoding: None,
                                         }),

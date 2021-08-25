@@ -17,9 +17,9 @@ extern crate serde;
 use async_std::sync::Arc;
 use futures::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
-use zenoh::net::ReplyReceiver;
 use std::marker::PhantomData;
 use uuid::Uuid;
+use zenoh::net::ReplyReceiver;
 
 use zenoh::net::QueryConsolidation;
 use zenoh::net::QueryTarget;
