@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
-#[derive(Error, Debug, Serialize, Deserialize, Clone)]
+#[derive(Error, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ZRPCError {
     DeserializationError(String),
     SerializationError(String),

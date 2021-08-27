@@ -164,18 +164,14 @@ where
                             _ => Ok(false),
                         }
                     }
-                    _ => {
-                        Err(ZRPCError::ZenohError(
-                            "Router information is not encoded in JSON".to_string(),
-                        ))
-                    }
+                    _ => Err(ZRPCError::ZenohError(
+                        "Router information is not encoded in JSON".to_string(),
+                    )),
                 }
             }
-            _ => {
-                Err(ZRPCError::ZenohError(
-                    "Component state is expected to be RAW in Zenoh!!".to_string(),
-                ))
-            }
+            _ => Err(ZRPCError::ZenohError(
+                "Component state is expected to be RAW in Zenoh!!".to_string(),
+            )),
         }
     }
 }
