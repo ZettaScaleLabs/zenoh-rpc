@@ -98,8 +98,8 @@ impl From<std::str::Utf8Error> for ZRPCError {
     }
 }
 
-impl From<zenoh::ZError> for ZRPCError {
-    fn from(err: zenoh::ZError) -> Self {
+impl From<zenoh_util::core::ZError> for ZRPCError {
+    fn from(err: zenoh_util::core::ZError) -> Self {
         ZRPCError::ZenohError(err.to_string())
     }
 }
@@ -107,6 +107,18 @@ impl From<zenoh::ZError> for ZRPCError {
 impl From<std::io::Error> for ZRPCError {
     fn from(err: std::io::Error) -> Self {
         ZRPCError::IOError(err.to_string())
+    }
+}
+
+impl From<std::string::FromUtf8Error> for ZRPCError {
+    fn from(err: std::string::FromUtf8Error) -> Self {
+        ZRPCError::DeserializationError(err.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for ZRPCError {
+    fn from(err: base64::DecodeError) -> Self {
+        ZRPCError::DeserializationError(err.to_string())
     }
 }
 

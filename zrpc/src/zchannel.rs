@@ -16,11 +16,11 @@ extern crate serde;
 
 use async_std::sync::Arc;
 use futures::prelude::*;
-use std::convert::TryFrom;
+use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
-
-use serde::{de::DeserializeOwned, Serialize};
+use zenoh::query::{Reply, ReplyReceiver};
+use zenoh::Session;
 
 use log::trace;
 
@@ -29,7 +29,7 @@ use crate::zrpcresult::{ZRPCError, ZRPCResult};
 
 #[derive(Clone)]
 pub struct ZClientChannel<Req, Resp> {
-    z: Arc<zenoh::Zenoh>,
+    z: Arc<Session>,
     path: String,
     server_uuid: Option<Uuid>,
     phantom_resp: PhantomData<Resp>,
@@ -42,7 +42,7 @@ where
     Req: std::fmt::Debug + Serialize,
 {
     pub fn new(
-        z: Arc<zenoh::Zenoh>,
+        z: Arc<Session>,
         path: String,
         server_uuid: Option<Uuid>,
     ) -> ZClientChannel<Req, Resp> {
@@ -59,36 +59,33 @@ where
     /// it serialized the request on the as properties in the selector
     /// the request is first serialized as json and then encoded in base64 and
     /// passed as a property named req
-    async fn send(
-        &self,
-        ws: zenoh::Workspace<'_>,
-        request: &Req,
-    ) -> ZRPCResult<zenoh::DataReceiver> {
+    async fn send(&self, request: &Req) -> ZRPCResult<ReplyReceiver> {
         let req = serialize::serialize_request(&request)?;
-        let selector = zenoh::Selector::try_from(format!(
+        let selector = format!(
             "{}/{}/eval?(req={})",
             self.path,
             self.server_uuid.unwrap(),
             base64::encode(req)
-        ))?;
+        );
         //Should create the appropriate Error type and the conversions form ZError
         trace!("Sending {:?} to  {:?}", request, selector);
-        Ok(ws.get(&selector).await?)
+        Ok(self.z.get(&selector).await?)
     }
 
     /// This function calls the eval on the server and deserialized the result
     /// if the value is not deserializable or the eval returns none it returns an IOError
     pub async fn call_fun(&self, request: Req) -> ZRPCResult<Resp> {
-        let ws = self.z.workspace(None).await?;
-        let mut data_receiver = self.send(ws, &request).await?;
+        let mut data_receiver = self.send(&request).await?;
         //takes only one, eval goes to only one
-        let resp = data_receiver.next().await;
-        log::trace!("Response from zenoh is {:?}", resp);
-        if let Some(data) = resp {
-            let value = data.value;
-            match value {
-                zenoh::Value::Raw(_size, rbuf) => {
-                    let raw_data = rbuf.to_vec();
+        let reply = data_receiver.next().await;
+        log::trace!("Response from zenoh is {:?}", reply);
+        if let Some(reply) = reply {
+            let sample = reply.data;
+            match sample.value.encoding.prefix {
+                //Workaround until encoding matching works
+                1 => {
+                    //Encoding::APP_OCTET_STREAM => {
+                    let raw_data = sample.value.payload.to_vec();
                     log::trace!("Size of response is {}", raw_data.len());
                     Ok(serialize::deserialize_response(&raw_data)?)
                 }
@@ -113,45 +110,45 @@ where
             return Ok(false);
         }
 
-        let ws = self.z.workspace(None).await?;
+        let selector = format!("{}/{}/state", self.path, self.server_uuid.unwrap());
 
-        let selector = zenoh::Selector::try_from(format!(
-            "{}/{}/state",
-            self.path,
-            self.server_uuid.unwrap()
-        ))?;
-
-        let ds = ws.get(&selector).await?;
-        let idata: Vec<zenoh::Data> = ds.collect().await;
+        let ds = self.z.get(&selector).await?;
+        let mut idata: Vec<Reply> = ds.collect().await;
 
         if idata.is_empty() {
             return Ok(false);
         }
 
-        let iv = &idata[0];
-        match &iv.value {
-            zenoh::Value::Raw(_, buf) => {
-                let raw_data = buf.to_vec();
+        let reply = idata.remove(0);
+        let sample = reply.data;
+        match sample.value.encoding.prefix {
+            //Workaround until encoding matching works
+            1 => {
+                //Encoding::APP_OCTET_STREAM => {
+                let raw_data = sample.value.payload.to_vec();
                 log::trace!("Size of state is {}", raw_data.len());
                 let cs = serialize::deserialize_state::<super::ComponentState>(&raw_data)?;
-                let selector =
-                    zenoh::Selector::try_from(format!("/@/router/{}", String::from(&cs.routerid)))?;
-                let mut ds = ws.get(&selector).await?;
-                let mut rdata = Vec::new();
+                let selector = format!("/@/router/{}", String::from(&cs.routerid));
+                let ds = self.z.get(&selector).await?;
 
-                while let Some(d) = ds.next().await {
-                    rdata.push(d)
-                }
+                let mut rdata: Vec<Reply> = ds.collect().await;
 
                 if rdata.len() != 1 {
                     return Err(ZRPCError::NotFound);
                 }
 
-                let rv = &rdata[0];
-                match &rv.value {
-                    zenoh::Value::Json(sv) => {
-                        log::trace!("Size of Zenoh router state is {}", sv.len());
-                        let ri = serde_json::from_str::<super::types::ZRouterInfo>(sv)?;
+                let rreply = rdata.remove(0);
+                let rsample = rreply.data;
+                match rsample.value.encoding.prefix {
+                    //Workaround until encoding matching works
+                    5 => {
+                        //Encoding::APP_JSON => {
+                        log::trace!(
+                            "Size of Zenoh router state is {}",
+                            rsample.value.payload.len()
+                        );
+                        let sv = String::from_utf8(rsample.value.payload.to_vec())?;
+                        let ri = serde_json::from_str::<super::types::ZRouterInfo>(&sv)?;
                         let mut it = ri.sessions.iter();
                         let f = it.find(|&x| x.peer == String::from(&cs.peerid).to_uppercase());
 

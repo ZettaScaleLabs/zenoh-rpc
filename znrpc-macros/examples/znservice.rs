@@ -4,15 +4,13 @@
 #[macro_use]
 extern crate std;
 
-// use async_std::prelude::FutureExt;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
-// use futures::prelude::*;
-// use std::convert::TryFrom;
+
 use std::str;
 use std::time::Duration;
 use uuid::Uuid;
-// use zenoh::*;
+use zenoh::prelude::*;
 
 //importing the macros
 use znrpc_macros::{znserver, znservice};
@@ -48,7 +46,7 @@ impl Hello for HelloZService {
 async fn main() {
     env_logger::init();
     let zproperties = Properties::from("mode=peer");
-    let zsession = Arc::new(zenoh::net::open(zproperties.into()).await.unwrap());
+    let zsession = Arc::new(zenoh::open(zproperties).await.unwrap());
     let service = HelloZService {
         ser_name: "test service".to_string(),
         counter: Arc::new(Mutex::new(0u64)),

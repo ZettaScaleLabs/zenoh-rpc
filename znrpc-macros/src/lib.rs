@@ -40,7 +40,6 @@ use syn::{
     ItemImpl, Pat, PatIdent, PatType, Receiver, ReturnType, Signature, Token, Type, Visibility,
 };
 use syn_serde::json;
-use uuid::Uuid;
 
 mod receiver;
 use receiver::ReplaceReceiver;
@@ -232,8 +231,8 @@ pub fn znservice(attr: TokenStream, input: TokenStream) -> TokenStream {
     let args: &[&[PatType]] = &evals.iter().map(|eval| &*eval.args).collect::<Vec<_>>();
 
     let service_uuid = match macro_args.service_uuid {
-        Some(u) => Uuid::from_str(&u).unwrap(),
-        None => Uuid::new_v4(),
+        Some(u) => uuid::Uuid::from_str(&u).unwrap(),
+        None => uuid::Uuid::new_v4(),
     };
 
     //service eval path
@@ -546,18 +545,13 @@ impl<'a> ZNServiceGenerator<'a> {
 
         quote! {
 
-        use std::convert::TryFrom;
-        use futures::prelude::*;
-        use async_std::prelude::FutureExt;
-        use zenoh::*;
-
         #(#attrs)*
         #vis trait #service_ident : Clone{
             #(#fns)*
 
             /// Returns the server object
-            fn #service_get_server_ident(self, z : async_std::sync::Arc<zenoh::net::Session>, id : Option<uuid::Uuid>) -> #server_ident<Self>{
-                let id = id.unwrap_or(Uuid::new_v4());
+            fn #service_get_server_ident(self, z : async_std::sync::Arc<zenoh::Session>, id : Option<uuid::Uuid>) -> #server_ident<Self>{
+                let id = id.unwrap_or_else(Uuid::new_v4);
                 log::trace!("Getting Server with ID {}", id);
                 #server_ident::new(z,self, id)
                 }
@@ -578,14 +572,14 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
             #[derive(Clone)]
             #vis struct #server_ident<S> {
-                z : async_std::sync::Arc<zenoh::net::Session>,
+                z : async_std::sync::Arc<zenoh::Session>,
                 server: S,
                 instance_id: uuid::Uuid,
                 state : async_std::sync::Arc<async_std::sync::RwLock<zrpc::ComponentState>>
             }
 
             impl<S> #server_ident<S> {
-                pub fn new(z : async_std::sync::Arc<zenoh::net::Session>, server : S, id : uuid::Uuid) -> Self {
+                pub fn new(z : async_std::sync::Arc<zenoh::Session>, server : S, id : uuid::Uuid) -> Self {
 
                     let ci = zrpc::ComponentState{
                         uuid : id,
@@ -643,12 +637,16 @@ impl<'a> ZNServiceGenerator<'a> {
                     where
                         S: #service_ident + Send + 'static,
                     {
+                        use futures::prelude::*;
+                        use async_std::prelude::FutureExt;
+
+
                         let zinfo = _self.z.info().await;
-                        let pid = zinfo.get(&zenoh::net::info::ZN_INFO_PID_KEY).ok_or(ZRPCError::MissingValue)?.to_uppercase();
-                        let rid = match zinfo.get(&zenoh::net::info::ZN_INFO_ROUTER_PID_KEY) {
+                        let pid = zinfo.get(&zenoh::info::ZN_INFO_PID_KEY).ok_or(ZRPCError::MissingValue)?.to_uppercase();
+                        let rid = match zinfo.get(&zenoh::info::ZN_INFO_ROUTER_PID_KEY) {
                             Some(r_info) => {
-                                if r_info != "" {
-                                    r_info.split(",").collect::<Vec<_>>()[0].to_uppercase()
+                                if !r_info.is_empty() {
+                                    r_info.split(',').collect::<Vec<_>>()[0].to_uppercase()
                                 } else {
                                     "".to_string()
                                 }
@@ -661,47 +659,32 @@ impl<'a> ZNServiceGenerator<'a> {
                         drop(ci);
                         let (s,r) = async_std::channel::bounded::<()>(1);
 
-                        let zsession = _self.z.clone();
+                        let zsession = async_std::sync::Arc::clone(&_self.z);
+
                         let state = _self.state.clone();
-                        let path = zenoh::Path::try_from(format!("/{}/{}/state",#eval_path,_self.instance_uuid()))?;
+                        let path = format!("{}{}/state",#eval_path,_self.instance_uuid());
 
                         log::trace!("Spawning state responder task");
                         let h = async_std::task::spawn(
                             async move {
                                 log::trace!("Registering queryable on {:?}", path);
-                                let mut queryable = zsession.declare_queryable(&path.clone().into(), zenoh::net::queryable::EVAL).await?;
+                                let mut queryable = zsession.register_queryable(&path).kind(zenoh::queryable::EVAL).await?;
                                 log::trace!("Queryable registered on {:?}", path);
                                 let rcv_loop = async {
                                     loop{
-                                        let query = queryable.receiver().next().await.ok_or_else(|| async_std::channel::RecvError)?;
+                                        let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                                         let ci = state.read().await;
-                                        let data = zrpc::serialize::serialize_state(&*ci).map_err(|_| async_std::channel::RecvError)?;
+                                        let data = zrpc::serialize::serialize_state(&*ci)?;
                                         drop(ci);
 
-                                        let sample = zenoh::net::Sample {
-                                            res_name: path.to_string().clone(),
-                                            payload: data.into(),
-                                            data_info: Some(zenoh::net::protocol::proto::DataInfo {
-                                                sliced: false,
-                                                source_id: None,
-                                                source_sn: None,
-                                                first_router_id: None,
-                                                first_router_sn: None,
-                                                timestamp: None,
-                                                // timestamp: Some(uhlc::Timestamp::new(
-                                                //     Default::default(),
-                                                //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                                // )),
-                                                kind: None,
-                                                encoding: None,
-                                            }),
-                                        };
+                                        let value = zenoh::prelude::Value::new(data.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                                        let sample  = zenoh::prelude::Sample::new(path.to_string(), value);
                                         log::trace!("Reply to state queryable!");
                                         query.reply(sample);
                                     }
                                 };
                                 log::trace!("Receiver loop started");
-                                rcv_loop.race(r.recv()).await.map_err(|e| ZRPCError::Error(format!("{}", e)))
+                                rcv_loop.race(r.recv().map_err(|e| ZRPCError::Error(e.to_string()))).await
                             }
                         );
                         Ok((s,h))
@@ -818,67 +801,47 @@ impl<'a> ZNServiceGenerator<'a> {
                     where
                         S: #service_ident + Send + 'static,
                     {
+                        use futures::prelude::*;
+                        use async_std::prelude::FutureExt;
 
                         let ci = _self.state.read().await;
                         match ci.status {
                             zrpc::ComponentStatus::REGISTERED => {
                                 drop(ci);
-                                let path = zenoh::Path::try_from(format!("{}/{}/eval",#eval_path, _self.instance_uuid()))?;
+                                let path = format!("{}{}/eval",#eval_path, _self.instance_uuid());
                                 log::trace!("Registering eval on {:?}", path);
-                                let mut queryable = _self.z
-                                    .declare_queryable(&path.clone().into(), zenoh::net::queryable::EVAL)
-                                    .await?;
+                                let mut queryable = _self.z.register_queryable(&path).kind(zenoh::queryable::EVAL).await?;
                                 log::trace!("Registered on {:?}", path);
                                 _barrier.wait().await;
                                 let rcv_loop = async {
                                     loop {
-                                        let query = queryable.receiver().next().await.ok_or_else(|| async_std::channel::RecvError)?;
+                                        let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                                         log::trace!("Received query {:?}", query);
-                                        //let base64_req = get_request.selector.properties.get("req").cloned().ok_or_else(|| async_std::channel::RecvError)?;
-                                        let base64_req = query.predicate.clone();
-                                        let b64_bytes = base64::decode(base64_req).map_err(|_| async_std::channel::RecvError)?;
-                                        let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes).map_err(|_| async_std::channel::RecvError)?;
+                                        let parsed_selector = query.selector().parse_value_selector()?;
+                                        let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                                        let b64_bytes = base64::decode(base64_req)?;
+                                        let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
                                         log::trace!("Received on {:?} {:?}", path, req);
 
                                         let mut ser = _self.server.clone();
-                                        //let q = query.clone();
-                                        let p = path.clone();
-                                        //log::trace!("Spawning task to respond to {:?}", req);
 
-                                        match req.clone() {
+                                        let encoded_resp = match req.clone() {
                                             #(
                                                 #request_ident::#camel_case_idents{#(#arg_pats),*} => {
                                                     let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
                                                     log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
-                                                    let encoded =  zrpc::serialize::serialize_response(&resp).map_err(|_| async_std::channel::RecvError)?;
-
-                                                    let sample = zenoh::net::Sample {
-                                                        res_name: p.to_string().clone(),
-                                                        payload: encoded.into(),
-                                                        data_info: Some(zenoh::net::protocol::proto::DataInfo {
-                                                            sliced: false,
-                                                            source_id: None,
-                                                            source_sn: None,
-                                                            first_router_id: None,
-                                                            first_router_sn: None,
-                                                            timestamp: None,
-                                                            // timestamp: Some(uhlc::Timestamp::new(
-                                                            //     Default::default(),
-                                                            //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                                            // )),
-                                                            kind: None,
-                                                            encoding: None,
-                                                        }),
-                                                    };
-                                                    query.reply(sample);
-                                                    log::trace!("Response {:?} sent", resp);
+                                                    zrpc::serialize::serialize_response(&resp)
                                                 }
                                             )*
-                                        }
+                                        }?;
+                                        let value = zenoh::prelude::Value::new(encoded_resp.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                                        let sample = zenoh::prelude::Sample::new(path.to_string(), value);
+                                        query.reply_async(sample).await;
+
                                     }
                                 };
                                 log::trace!("RPC Receiver loop started...");
-                                let res = rcv_loop.race(_stop.recv()).await.map_err(|e| ZRPCError::Error(format!("{}", e)));
+                                let res = rcv_loop.race(_stop.recv().map_err(|e| ZRPCError::ChannelError(e.to_string()))).await;
                                 log::trace!("RPC Receiver loop existing  with {:?}", res);
                                 res
                             }
@@ -1025,7 +988,7 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
             impl #client_ident {
                 #vis fn new(
-                    z : async_std::sync::Arc<zenoh::net::Session>,
+                    z : async_std::sync::Arc<zenoh::Session>,
                     instance_id : uuid::Uuid
                 ) -> #client_ident {
                         let new_client = zrpc::ZNClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
@@ -1041,69 +1004,84 @@ impl<'a> ZNServiceGenerator<'a> {
                 }
 
                 #vis fn find_servers(
-                    z : async_std::sync::Arc<zenoh::net::Session>
+                    z : async_std::sync::Arc<zenoh::Session>
                 ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
                 {
                     async move {
-                        log::trace!("Find servers selector {}", format!("{}*/state",#eval_path));
-                        let reskey = net::ResKey::RId(
-                                z
-                                .declare_resource(&net::ResKey::RName(format!("{}*/state",#eval_path)))
-                                .await?,
-                                );
+                        use futures::prelude::*;
+                        let selector = format!("{}*/state",#eval_path);
+                        log::trace!("Find servers selector {}", selector);
                         let mut servers = Vec::new();
 
-                        let mut replies = z
-                            .query(
-                                &reskey,
-                                "",
-                                net::QueryTarget::default(),
-                                net::QueryConsolidation::default(),
-                            )
-                            .await?;
+                        let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
 
                         while let Some(d) = replies.next().await {
-                            let buf = d.data.payload;
-                            let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&buf.to_vec())?;
-                            servers.push(ca.uuid);
+                            let sample = d.data;
+                            match sample.value.encoding.prefix { // Workaround
+                                1 => {
+                                        //Encoding::APP_OCTECT_STREAM => {
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.to_vec())?;
+                                        servers.push(ca.uuid);
+                                    }
+                                _ => {
+                                    return Err(ZRPCError::ZenohError(
+                                        "Server information is not correctly encoded".to_string(),
+                                    ))
+                                }
+                            }
+
+                        }
+                        Ok(servers)
+                    }
+                }
+
+                #vis fn find_servers_info(
+                    z : async_std::sync::Arc<zenoh::Session>
+                ) -> impl std::future::Future<Output = ZRPCResult<Vec<zrpc::ComponentState>>> + 'static
+                {
+                    async move {
+                        use futures::prelude::*;
+                        let selector = format!("{}*/state",#eval_path);
+                        log::trace!("Find servers selector {}", selector);
+                        let mut servers = Vec::new();
+
+                        let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
+
+                        while let Some(d) = replies.next().await {
+                            let sample = d.data;
+                            match sample.value.encoding.prefix { // Workaround
+                                1 => {
+                                        //Encoding::APP_OCTECT_STREAM => {
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.to_vec())?;
+                                        servers.push(ca);
+                                    }
+                                _ => {
+                                    return Err(ZRPCError::ZenohError(
+                                        "Server information is not correctly encoded".to_string(),
+                                    ))
+                                }
+                            }
+
                         }
                         Ok(servers)
                     }
                 }
 
                 #vis fn find_local_servers(
-                    z : async_std::sync::Arc<zenoh::net::Session>
+                    z : async_std::sync::Arc<zenoh::Session>
                 ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
                 {
                     async move {
-                        log::trace!("Find servers selector {}", format!("{}*/state",#eval_path));
-                        let reskey = net::ResKey::RId(
-                                z
-                                .declare_resource(&net::ResKey::RName(format!("{}*/state",#eval_path)))
-                                .await?,
-                                );
-                        let mut servers = Vec::new();
+                        use futures::prelude::*;
 
-                        let mut replies = z
-                            .query(
-                                &reskey,
-                                "",
-                                net::QueryTarget::default(),
-                                net::QueryConsolidation::default(),
-                            )
-                            .await?;
 
-                        while let Some(d) = replies.next().await {
-                            let buf = d.data.payload;
-                            let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&buf.to_vec())?;
-                            servers.push(ca);
-                        }
+                        let servers = Self::find_servers_info(async_std::sync::Arc::clone(&z)).await?;
 
                         let zinfo = z.info().await;
-                        let rid = match zinfo.get(&zenoh::net::info::ZN_INFO_ROUTER_PID_KEY) {
+                        let rid = match zinfo.get(&zenoh::info::ZN_INFO_ROUTER_PID_KEY) {
                             Some(r_info) => {
-                                if r_info != "" {
-                                    r_info.split(",").collect::<Vec<_>>()[0].to_uppercase()
+                                if !r_info.is_empty() {
+                                    r_info.split(',').collect::<Vec<_>>()[0].to_uppercase()
                                 } else {
                                     return Err(ZRPCError::NoRouter)
                                 }
@@ -1114,58 +1092,43 @@ impl<'a> ZNServiceGenerator<'a> {
                         log::trace!("Router ID is {}", rid);
 
                         // This is a get from in the Router Admin space
-                        let reskey = net::ResKey::RId(
-                            z
-                            .declare_resource(&net::ResKey::RName(format!("/@/router/{}", rid)))
-                            .await?,
-                            );
+                        let selector = format!("/@/router/{}", rid);
 
-                        let rdata : Vec<zenoh::net::Reply> = z.query(
-                            &reskey,
-                            "",
-                            net::QueryTarget::default(),
-                            net::QueryConsolidation::default(),
-                            )
-                            .await?
-                            .collect()
-                            .await;
+                        let mut rdata: Vec<zenoh::query::Reply> = z.get(&selector).await?.collect().await;
 
-                        if rdata.len() == 0 {
+                        if rdata.is_empty() {
                             return Err(ZRPCError::NotFound);
                         }
 
-                        let router_data = &rdata[0].data;
+                        let router_data = rdata.remove(0);
+                        let sample  = router_data.data;
 
-                        // Getting Zenoh encoding for the reply
-                        let reply_encoding = if let Some(info) = router_data.data_info.clone() {
-                            info.encoding.unwrap_or(zenoh::net::protocol::proto::encoding::APP_OCTET_STREAM)
-                        } else {
-                            zenoh::net::protocol::proto::encoding::APP_OCTET_STREAM
-                        };
 
-                        let router_value = zenoh::Value::decode(reply_encoding, router_data.payload.clone())?;
 
-                        // Checking the value and finding local services
-                        match router_value {
-                            zenoh::Value::Json(sv) => {
-                                let ri = zrpc::serialize::deserialize_router_info(&sv.as_bytes())?;
-                                let r : Vec<Uuid> = servers.into_iter().filter_map(
-                                    |ci| {
+                        match sample.value.encoding.prefix {
+                            5 => {
+                                let ri = zrpc::serialize::deserialize_router_info(&sample.value.payload.to_vec())?;
+                                let r: Vec<Uuid> = servers
+                                    .into_iter()
+                                    .filter_map(|ci| {
                                         let pid = String::from(&ci.peerid).to_uppercase();
                                         let mut it = ri.clone().sessions.into_iter();
                                         let f = it.find(|x| x.peer == pid.clone());
-                                        if f.is_none(){
+                                        if f.is_none() {
                                             None
                                         } else {
                                             Some(ci.uuid)
                                         }
-                                    }
-                                )
-                                .collect();
-                                log::trace!("Local Servers Result {:?}", r);
+                                    })
+                                    .collect();
+
                                 Ok(r)
                             }
-                            _ => Err(ZRPCError::ZenohError("Router information is not encoded in JSON".to_string()))
+                            _ => {
+                                return Err(ZRPCError::ZenohError(
+                                    "Router information is not encoded in JSON".to_string(),
+                                ))
+                            }
                         }
                     }
                 }
