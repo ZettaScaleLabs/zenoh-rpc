@@ -5,20 +5,16 @@ extern crate std;
 
 use async_std::sync::Arc;
 use async_std::task;
-use futures::prelude::*;
-use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::*;
-
-use async_std::prelude::FutureExt;
+use zenoh::prelude::*;
 
 use std::str;
 use uuid::Uuid;
-use zrpc::ZNServe;
-use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use znrpc_macros::{znserver, znservice};
+use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
+use zrpc::ZNServe;
 
 static DEFAULT_MODE: &str = "client";
 static DEFAULT_ZMODE: &str = "peer";
@@ -92,18 +88,16 @@ async fn client(args: CallArgs) {
     };
 
     let zproperties = Properties::from(properties);
-    let zenoh = Arc::new(zenoh::net::open(zproperties.clone().into()).await.unwrap());
+    let zenoh = Arc::new(zenoh::open(zproperties).await.unwrap());
 
     task::sleep(std::time::Duration::from_secs(1)).await;
 
-    let info: zenoh::Properties = zenoh.info().await.into();
+    let info: Properties = zenoh.info().await.into();
     for (key, value) in info.iter() {
         log::trace!("{} : {}", key, value);
     }
 
-    let local_servers = BenchClient::find_servers(zenoh.clone())
-        .await
-        .unwrap();
+    let local_servers = BenchClient::find_servers(zenoh.clone()).await.unwrap();
     log::trace!("Servers: {:?}", local_servers);
 
     let client = BenchClient::new(zenoh.clone(), local_servers[0]);
@@ -133,20 +127,17 @@ async fn client(args: CallArgs) {
 
     let start = Instant::now();
 
-
-     while start.elapsed() < Duration::from_secs(args.duration) {
-            let now_q = Instant::now();
-            let _r = client.bench().await;
-            count.fetch_add(1, Ordering::AcqRel);
-            rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);
+    while start.elapsed() < Duration::from_secs(args.duration) {
+        let now_q = Instant::now();
+        let _r = client.bench().await;
+        count.fetch_add(1, Ordering::AcqRel);
+        rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);
     }
-
 
     //zenoh.close().await.unwrap();
 }
 
 async fn server(args: CallArgs) {
-
     let properties = if args.zenoh_mode == "peer" {
         format!("mode={}", args.zenoh_mode)
     } else {
@@ -154,7 +145,7 @@ async fn server(args: CallArgs) {
     };
 
     let zproperties = Properties::from(properties);
-    let zenoh = Arc::new(zenoh::net::open(zproperties.clone().into()).await.unwrap());
+    let zenoh = Arc::new(zenoh::open(zproperties).await.unwrap());
 
     let data = vec![0; args.size as usize];
 

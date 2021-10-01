@@ -10,14 +10,13 @@ use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::*;
 
 use async_std::prelude::FutureExt;
 
 use std::str;
 use uuid::Uuid;
+use znrpc_macros::znservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use znrpc_macros::{znservice};
 
 static DEFAULT_INT: &str = "5";
 static DEFAULT_SIZE: &str = "8";
@@ -43,7 +42,6 @@ pub trait Bench {
     async fn bench(&self) -> Vec<u8>;
 }
 
-
 #[async_std::main]
 async fn main() {
     // initiate logging
@@ -67,7 +65,11 @@ async fn main() {
             let r = rt.swap(0, Ordering::AcqRel);
             let msgs = n / i;
             let thr = (n * s * 8) / i;
-            let rtt = if n == 0 { 0f64 } else { (r as f64) / (n as f64) } as f64;
+            let rtt = if n == 0 {
+                0f64
+            } else {
+                (r as f64) / (n as f64)
+            } as f64;
             println!("{},{},{},{},{},{}", msgs, s, thr, i, rtt, kind);
         }
     });
@@ -78,7 +80,6 @@ async fn main() {
         std::process::exit(0);
     });
 
-
     let data = vec![0; args.size as usize];
     let resp = BenchResponse::Bench(data);
 
@@ -88,6 +89,4 @@ async fn main() {
         count.fetch_add(1, Ordering::AcqRel);
         rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);
     }
-
 }
-

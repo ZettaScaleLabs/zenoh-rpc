@@ -20,7 +20,6 @@ members = [
 
 exclude = [
   "zrpc-perf",
-
 ]
 
 #[profile.release]

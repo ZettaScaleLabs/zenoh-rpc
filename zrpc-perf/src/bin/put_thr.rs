@@ -1,6 +1,5 @@
-use std::convert::TryFrom;
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -27,14 +26,13 @@ async fn main() {
         None => format!("mode={}", args.mode),
     };
     let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let zenoh = zenoh::open(zproperties).await.unwrap();
 
-    let path: Path = Path::try_from("/test/thr").unwrap();
+    let path = String::from("/test/thr");
     let data = vec![0; args.size as usize];
-    let value = Value::from(data);
+    let value = Value::new(data.into());
 
     loop {
-        ws.put(&path, value.clone()).await.unwrap();
+        zenoh.put(&path, value.clone()).await.unwrap();
     }
 }

@@ -1,11 +1,10 @@
 use async_std::sync::Arc;
 use async_std::task;
 use futures::prelude::*;
-use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_INT: &str = "5";
@@ -47,10 +46,9 @@ async fn main() {
     };
 
     let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let zenoh = zenoh::open(zproperties).await.unwrap();
 
-    let path = Selector::try_from("/test/eval".to_string()).unwrap();
+    let path = String::from("/test/eval");
 
     let c = count.clone();
     let s = args.size;
@@ -72,7 +70,7 @@ async fn main() {
 
     while start.elapsed() < Duration::from_secs(args.duration) {
         let now_q = Instant::now();
-        let mut data_stream = ws.get(&path).await.unwrap();
+        let mut data_stream = zenoh.get(&path).await.unwrap();
         while data_stream.next().await.is_some() {}
         count.fetch_add(1, Ordering::AcqRel);
         rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);

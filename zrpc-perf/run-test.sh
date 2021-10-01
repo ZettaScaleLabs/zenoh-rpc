@@ -19,20 +19,14 @@ SERVER_BIN="gserver"
 CLIENT_BIN="gclient"
 
 GET_BIN="get"
-QUERY_BIN="query"
 
-CALL_BIN="zrpc_call"
+
 
 NCALL_BIN="znrpc_call"
 
 EVAL_BIN="eval"
 GET_EVAL_BIN="get_eval"
 
-NET_EVAL_BIN="queryable"
-NET_GET_EVAL_BIN="query_eval"
-
-STATE_BIN="zrpc_state"
-ZSTATE_BIN="zrpc_get_zenoh"
 
 SER_BIN="serialization"
 DE_BIN="deserialization"
@@ -94,23 +88,10 @@ do
 done
 
 
-plog "Running baseline query bench"
-
-x=$INITIAL_SIZE
-while [ $x -le $END_SIZE ]
-do
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
-   ZENOHD_PID=$!
-   plog "Zenohd running PID $ZENOHD_PID"
-   plog "Running QUERY bench with $x size"
-   $BIN_DIR/$QUERY_BIN -d $DURATION -i 1 -m client -p tcp/127.0.0.1:7447 -s $x > $OUT_DIR/query-$x-$TS.csv
-   plog "Done QUERY bench with $x size"
-   kill -9 $ZENOHD_PID
-   x=$(( $x * 2 ))
-done
 
 
-plog "Running baseline net queryable bench"
+
+plog "Running baseline get queryable bench"
 
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
@@ -130,7 +111,7 @@ do
 done
 
 
-plog "Running baseline net p2p queryable bench"
+plog "Running baseline get p2p queryable bench"
 
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
@@ -161,53 +142,6 @@ do
    plog "Done EVAL bench with $x size"
    kill -9 $ZENOHD_PID
    kill -9 $EV_PID
-   x=$(( $x * 2 ))
-done
-
-plog "Running ZRPC Call bench"
-
-
-x=$INITIAL_SIZE
-while [ $x -le $END_SIZE ]
-do
-   plog "Starting zenohd..."
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
-   ZENOHD_PID=$!
-   plog "Zenohd running PID $ZENOHD_PID"
-   sleep 2
-   nohup $BIN_DIR/$CALL_BIN -m server -r tcp/127.0.0.1:7447 -s $x > /tmp/server.out 2>&1 &
-   SERVER_PID=$!
-   plog "ZRPC Server running $SERVER_PID"
-   sleep 6
-   plog "Running zrpc call bench with $x size"
-   $BIN_DIR/$CALL_BIN -d $DURATION -i 1 -m client -r tcp/127.0.0.1:7447 -s $x  > $OUT_DIR/call-$x-$TS.csv
-   plog "Done ZRPC Call bench, killing server and zenoh"
-   kill -9 $SERVER_PID
-   kill -9 $ZENOHD_PID
-   x=$(( $x * 2 ))
-done
-
-
-plog "Running ZRPC Call w/o check bench"
-
-
-x=$INITIAL_SIZE
-while [ $x -le $END_SIZE ]
-do
-   plog "Starting zenohd..."
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
-   ZENOHD_PID=$!
-   plog "Zenohd running PID $ZENOHD_PID"
-   sleep 2
-   nohup $BIN_DIR/$CALL_BIN -m server -r tcp/127.0.0.1:7447 -s $x > /tmp/server.out 2>&1 &
-   SERVER_PID=$!
-   plog "ZRPC Server running $SERVER_PID"
-   sleep 6
-   plog "Running zrpc call w/o chk bench with $x size"
-   $BIN_DIR/$CALL_BIN -d $DURATION -i 1 -m client -r tcp/127.0.0.1:7447 -s $x -n > $OUT_DIR/nochk-call-$x-$TS.csv
-   plog "Done ZRPC Call bench, killing server and zenoh"
-   kill -9 $SERVER_PID
-   kill -9 $ZENOHD_PID
    x=$(( $x * 2 ))
 done
 

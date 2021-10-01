@@ -14,9 +14,7 @@
 use async_std::future;
 use async_std::stream::StreamExt;
 use clap::{App, Arg};
-use zenoh::net::ResKey::*;
-use zenoh::net::*;
-use zenoh::Properties;
+use zenoh::prelude::*;
 
 #[async_std::main]
 async fn main() {
@@ -25,39 +23,20 @@ async fn main() {
 
     let config = parse_args();
 
-    let session = open(config.into()).await.unwrap();
+    let session = zenoh::open(config).await.unwrap();
 
     // The resource to echo the data back
-    let reskey_pong = RId(session
-        .declare_resource(&RName("/test/pong".to_string()))
-        .await
-        .unwrap());
-    let _publ = session.declare_publisher(&reskey_pong).await.unwrap();
+    let reskey_pong = String::from("/test/pong");
 
     // The resource to read the data from
-    let reskey_ping = RId(session
-        .declare_resource(&RName("/test/ping".to_string()))
-        .await
-        .unwrap());
-    let sub_info = SubInfo {
-        reliability: Reliability::Reliable,
-        mode: SubMode::Push,
-        period: None,
-    };
+    let reskey_ping = String::from("/test/ping");
 
-    let mut sub = session
-        .declare_subscriber(&reskey_ping, &sub_info)
-        .await
-        .unwrap();
+    let mut sub = session.subscribe(&reskey_ping).await.unwrap();
+
     while let Some(sample) = sub.receiver().next().await {
         session
-            .write_ext(
-                &reskey_pong,
-                sample.payload,
-                encoding::DEFAULT,
-                data_kind::DEFAULT,
-                CongestionControl::Block, // Make sure to not drop messages because of congestion control
-            )
+            .put(&reskey_pong, sample.value)
+            .congestion_control(zenoh::publisher::CongestionControl::Block) // Make sure to not drop messages because of congestion control
             .await
             .unwrap();
     }

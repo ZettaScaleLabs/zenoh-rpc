@@ -22,7 +22,6 @@ serde = { version = "1.0.55", features = ["derive"] }
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "apis-merge"}
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "apis-merge" }
 zrpc = {path = "../zrpc"}
-zrpc-macros = {path = "../zrpc-macros"}
 znrpc-macros = {path = "../znrpc-macros"}
 base64 = "0.13.0"
 log = "0.4.11"

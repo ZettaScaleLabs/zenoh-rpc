@@ -1,7 +1,6 @@
 use futures::prelude::*;
-use std::convert::TryFrom;
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::{prelude::*, queryable::EVAL};
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -26,14 +25,15 @@ async fn main() {
         None => format!("mode={}", args.mode),
     };
     let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let zenoh = zenoh::open(zproperties).await.unwrap();
 
-    let path = &Path::try_from("/test/eval").unwrap();
+    let path = String::from("/test/eval");
 
     let data: Vec<u8> = vec![0; args.size as usize];
-    let mut get_stream = ws.register_eval(&path.into()).await.unwrap();
-    while let Some(get_request) = get_stream.next().await {
-        get_request.reply(path.clone(), data.clone().into());
+    let mut query_stream = zenoh.register_queryable(&path).kind(EVAL).await.unwrap();
+    while let Some(query) = query_stream.receiver().next().await {
+        let value = Value::new(data.clone().into());
+        let sample = Sample::new(path.clone(), value);
+        query.reply_async(sample).await;
     }
 }
