@@ -131,6 +131,10 @@ pub trait ZNServe<Req>: Sized + Clone {
     // // // Announce, state changes to ANNOUNCED
     // // //fn announce(&self);
 
+    /// The actual run loop serving the queriable
+    #[allow(clippy::type_complexity)]
+    fn run(&self) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>>;
+
     /// State changes to SERVING, calls serve on a task::spawn, returns a stop sender and the serve task handle
     #[allow(clippy::type_complexity)]
     fn start(
