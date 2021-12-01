@@ -20,6 +20,8 @@ extern crate serde_json;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::zrpcresult::ZRPCError;
+
 #[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
 // pub enum ComponentStatus {
 //     HALTED = 0,
@@ -76,4 +78,10 @@ pub struct ZRouterInfo {
     pub sessions: Vec<ZSessionInfo>,
     pub plugins: Vec<ZPluginInfo>,
     pub time: Option<String>,
+}
+
+pub enum RunResultAction {
+    Restart(Option<ZRPCError>),
+    Stop,
+    StopError(ZRPCError),
 }
