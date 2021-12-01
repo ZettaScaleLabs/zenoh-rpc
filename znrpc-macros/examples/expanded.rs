@@ -125,7 +125,7 @@ where
 
             let h = async_std::task::spawn(async move {
                 let mut queryable = zsession
-                    .register_queryable(&path)
+                    .queryable(&path)
                     .kind(zenoh::queryable::EVAL)
                     .await?;
 
@@ -277,7 +277,7 @@ where
 
                     let mut queryable = _self
                         .z
-                        .register_queryable(&path)
+                        .queryable(&path)
                         .kind(zenoh::queryable::EVAL)
                         .await?;
 
@@ -666,8 +666,11 @@ impl Hello for HelloZService {
 async fn main() {
     {
         env_logger::init();
-        let zproperties = zenoh::prelude::Properties::from("mode=peer");
-        let zsession = Arc::new(zenoh::open(zproperties).await.unwrap());
+        let mut config = zenoh::config::Config::default();
+        config
+            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+            .unwrap();
+        let zsession = Arc::new(zenoh::open(config).await.unwrap());
 
         let service = HelloZService {
             ser_name: "test service".to_string(),

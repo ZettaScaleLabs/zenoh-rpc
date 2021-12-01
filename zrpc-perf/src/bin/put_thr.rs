@@ -21,12 +21,17 @@ async fn main() {
 
     //println!("Args {:?}", args);
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
+
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
     };
-    let zproperties = Properties::from(properties);
-    let zenoh = zenoh::open(zproperties).await.unwrap();
+    let zenoh = zenoh::open(config).await.unwrap();
 
     let path = String::from("/test/thr");
     let data = vec![0; args.size as usize];

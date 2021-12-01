@@ -18,7 +18,6 @@ use async_std::sync::{Arc, Mutex};
 
 use std::str;
 use uuid::Uuid;
-use zenoh::prelude::*;
 
 //importing the macros
 use znrpc_macros::{znserver, znservice};
@@ -53,8 +52,11 @@ impl Hello for HelloZService {
 #[test]
 fn service_discovery() {
     async_std::task::block_on(async {
-        let zproperties = Properties::from("mode=peer");
-        let zsession = Arc::new(zenoh::open(zproperties).await.unwrap());
+        let mut config = zenoh::config::Config::default();
+        config
+            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+            .unwrap();
+        let zsession = Arc::new(zenoh::open(config).await.unwrap());
         let service = HelloZService {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
@@ -82,8 +84,12 @@ fn service_discovery() {
 #[test]
 fn service_call() {
     async_std::task::block_on(async {
-        let zproperties = Properties::from("mode=peer");
-        let zsession = Arc::new(zenoh::open(zproperties).await.unwrap());
+        let mut config = zenoh::config::Config::default();
+        config
+            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+            .unwrap();
+        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+
         let service = HelloZService {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
@@ -126,8 +132,11 @@ fn service_call() {
 #[test]
 fn service_unavailable() {
     async_std::task::block_on(async {
-        let zproperties = Properties::from("mode=peer");
-        let zsession = Arc::new(zenoh::open(zproperties).await.unwrap());
+        let mut config = zenoh::config::Config::default();
+        config
+            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+            .unwrap();
+        let zsession = Arc::new(zenoh::open(config).await.unwrap());
 
         let servers = HelloClient::find_servers(zsession).await.unwrap();
         let empty: Vec<Uuid> = vec![];

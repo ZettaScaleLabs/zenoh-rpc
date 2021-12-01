@@ -33,12 +33,17 @@ async fn main() {
     let rtts = Arc::new(AtomicU64::new(0));
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
+
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
     };
-    let zproperties = Properties::from(properties);
-    let zenoh = zenoh::open(zproperties).await.unwrap();
+    let zenoh = zenoh::open(config).await.unwrap();
 
     let selector = format!("/test/{}", args.size);
 

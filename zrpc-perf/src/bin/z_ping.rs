@@ -55,14 +55,17 @@ async fn main() {
         "CRC-PING"
     };
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
-    };
-    let zproperties = Properties::from(properties);
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
 
-    let session = zenoh::open(zproperties).await.unwrap();
-    let session = Arc::new(session);
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
+    };
+    let session = Arc::new(zenoh::open(config).await.unwrap());
 
     let (s, r) = unbounded::<PingInfo>();
 
@@ -133,7 +136,7 @@ async fn main() {
         pending.lock().await.insert(count, Instant::now());
         session
             .put(&reskey_ping, value)
-            .congestion_control(zenoh::publisher::CongestionControl::Block) // Make sure to not drop messages because of congestion control
+            .congestion_control(zenoh::publication::CongestionControl::Block) // Make sure to not drop messages because of congestion control
             .await
             .unwrap();
 

@@ -5,15 +5,10 @@ extern crate std;
 
 use async_std::sync::Arc;
 use async_std::task;
-use futures::prelude::*;
-use std::convert::TryFrom;
+use std::str;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-
-use async_std::prelude::FutureExt;
-
-use std::str;
 use uuid::Uuid;
 use znrpc_macros::znservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};

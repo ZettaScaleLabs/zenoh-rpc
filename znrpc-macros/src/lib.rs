@@ -668,7 +668,7 @@ impl<'a> ZNServiceGenerator<'a> {
                         let h = async_std::task::spawn(
                             async move {
                                 log::trace!("Registering queryable on {:?}", path);
-                                let mut queryable = zsession.register_queryable(&path).kind(zenoh::queryable::EVAL).await?;
+                                let mut queryable = zsession.queryable(&path).kind(zenoh::queryable::EVAL).await?;
                                 log::trace!("Queryable registered on {:?}", path);
                                 let rcv_loop = async {
                                     loop{
@@ -810,7 +810,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                 drop(ci);
                                 let path = format!("{}{}/eval",#eval_path, _self.instance_uuid());
                                 log::trace!("Registering eval on {:?}", path);
-                                let mut queryable = _self.z.register_queryable(&path).kind(zenoh::queryable::EVAL).await?;
+                                let mut queryable = _self.z.queryable(&path).kind(zenoh::queryable::EVAL).await?;
                                 log::trace!("Registered on {:?}", path);
                                 _barrier.wait().await;
                                 let rcv_loop = async {

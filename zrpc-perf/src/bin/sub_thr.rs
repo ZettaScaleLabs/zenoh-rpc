@@ -31,14 +31,17 @@ async fn main() {
     let args = GetArgs::from_args();
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    //Fields are the same for each test,
-    // if they do not make sense they are set to 0
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
+
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
     };
-    let zproperties = Properties::from(properties);
-    let session = zenoh::open(zproperties).await.unwrap();
+    let zenoh = zenoh::open(config).await.unwrap();
 
     let reskey = String::from("/test/thr");
 
@@ -61,7 +64,7 @@ async fn main() {
         }
     });
 
-    let _subscriber = session
+    let _subscriber = zenoh
         .subscribe(&reskey)
         .callback(move |_sample| {
             count.fetch_add(1, Ordering::AcqRel);

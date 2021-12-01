@@ -81,14 +81,16 @@ async fn client(args: CallArgs) {
     let rtts = Arc::new(AtomicU64::new(0));
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    let properties = if args.zenoh_mode == "peer" {
-        format!("mode={}", args.zenoh_mode)
-    } else {
-        format!("mode={};peer={}", args.zenoh_mode, args.router)
-    };
+    let mut config = zenoh::config::Config::default();
+    config
+        .set_mode(Some(args.zenoh_mode.parse().unwrap()))
+        .unwrap();
 
-    let zproperties = Properties::from(properties);
-    let zenoh = Arc::new(zenoh::open(zproperties).await.unwrap());
+    if args.zenoh_mode == "client" {
+        let peers: Vec<Locator> = vec![args.router.parse().unwrap()];
+        config.set_peers(peers).unwrap();
+    }
+    let zenoh = Arc::new(zenoh::open(config).await.unwrap());
 
     task::sleep(std::time::Duration::from_secs(1)).await;
 
@@ -138,14 +140,17 @@ async fn client(args: CallArgs) {
 }
 
 async fn server(args: CallArgs) {
-    let properties = if args.zenoh_mode == "peer" {
-        format!("mode={}", args.zenoh_mode)
-    } else {
-        format!("mode={};peer={}", args.zenoh_mode, args.router)
-    };
+    let mut config = zenoh::config::Config::default();
+    config
+        .set_mode(Some(args.zenoh_mode.parse().unwrap()))
+        .unwrap();
 
-    let zproperties = Properties::from(properties);
-    let zenoh = Arc::new(zenoh::open(zproperties).await.unwrap());
+    if args.zenoh_mode == "client" {
+        let peers: Vec<Locator> = vec![args.router.parse().unwrap()];
+        config.set_peers(peers).unwrap();
+    }
+
+    let zenoh = Arc::new(zenoh::open(config).await.unwrap());
 
     let data = vec![0; args.size as usize];
 

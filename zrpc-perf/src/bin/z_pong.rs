@@ -11,46 +11,42 @@
 // Contributors:
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
-use async_std::future;
-use async_std::stream::StreamExt;
 use clap::{App, Arg};
+use zenoh::config::Config;
 use zenoh::prelude::*;
+use zenoh::publication::CongestionControl;
 
-#[async_std::main]
-async fn main() {
+fn main() {
     // initiate logging
     env_logger::init();
 
     let config = parse_args();
 
-    let session = zenoh::open(config).await.unwrap();
+    let session = zenoh::open(config).wait().unwrap();
 
-    // The resource to echo the data back
-    let reskey_pong = String::from("/test/pong");
+    // The key expression to read the data from
+    let key_expr_ping = session.declare_expr("/test/ping").wait().unwrap();
 
-    // The resource to read the data from
-    let reskey_ping = String::from("/test/ping");
+    // The key expression to echo the data back
+    let key_expr_pong = session.declare_expr("/test/pong").wait().unwrap();
 
-    let mut sub = session.subscribe(&reskey_ping).await.unwrap();
+    let mut sub = session.subscribe(&key_expr_ping).wait().unwrap();
 
-    while let Some(sample) = sub.receiver().next().await {
+    while let Ok(sample) = sub.receiver().recv() {
         session
-            .put(&reskey_pong, sample.value)
-            .congestion_control(zenoh::publisher::CongestionControl::Block) // Make sure to not drop messages because of congestion control
-            .await
+            .put(&key_expr_pong, sample.value)
+            // Make sure to not drop messages because of congestion control
+            .congestion_control(CongestionControl::Block)
+            .wait()
             .unwrap();
     }
-
-    // Stop forever
-    future::pending::<()>().await;
 }
 
-fn parse_args() -> Properties {
-    let args = App::new("zenoh-net delay sub example")
+fn parse_args() -> Config {
+    let args = App::new("zenoh roundtrip pong example")
         .arg(
-            Arg::from_usage("-m, --mode=[MODE]  'The zenoh session mode.")
-                .possible_values(&["peer", "client"])
-                .default_value("peer"),
+            Arg::from_usage("-m, --mode=[MODE]  'The zenoh session mode (peer by default).")
+                .possible_values(&["peer", "client"]),
         )
         .arg(Arg::from_usage(
             "-e, --peer=[LOCATOR]...   'Peer locators used to initiate the zenoh session.'",
@@ -63,14 +59,29 @@ fn parse_args() -> Properties {
         ))
         .get_matches();
 
-    let mut config = Properties::default();
-    for key in ["mode", "peer", "listener"].iter() {
-        if let Some(value) = args.values_of(key) {
-            config.insert(key.to_string(), value.collect::<Vec<&str>>().join(","));
+    let mut config = if let Some(conf_file) = args.value_of("config") {
+        Config::from_file(conf_file).unwrap()
+    } else {
+        Config::default()
+    };
+    if let Some(Ok(mode)) = args.value_of("mode").map(|mode| mode.parse()) {
+        config.set_mode(Some(mode)).unwrap();
+    }
+    match args.value_of("mode").map(|m| m.parse()) {
+        Some(Ok(mode)) => {
+            config.set_mode(Some(mode)).unwrap();
         }
+        Some(Err(())) => panic!("Invalid mode"),
+        None => {}
+    };
+    if let Some(values) = args.values_of("peer") {
+        config.peers.extend(values.map(|v| v.parse().unwrap()))
+    }
+    if let Some(values) = args.values_of("listeners") {
+        config.listeners.extend(values.map(|v| v.parse().unwrap()))
     }
     if args.is_present("no-multicast-scouting") {
-        config.insert("multicast_scouting".to_string(), "false".to_string());
+        config.scouting.multicast.set_enabled(Some(false)).unwrap();
     }
 
     config
