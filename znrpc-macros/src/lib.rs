@@ -797,56 +797,39 @@ impl<'a> ZNServiceGenerator<'a> {
                     where
                         S: #service_ident + Send + 'static,
                     {
-                        let path = zenoh::Path::try_from(format!("{}/{}/eval",#eval_path, _self.instance_uuid()))?;
+                        use futures::prelude::*;
+                        let path = format!("{}{}/eval",#eval_path, _self.instance_uuid());
                         log::trace!("Registering eval on {:?}", path);
-                        let mut queryable = _self.z
-                            .declare_queryable(&path.clone().into(), zenoh::net::queryable::EVAL)
+                        let mut queryable = _self
+                            .z
+                            .queryable(&path)
+                            .kind(zenoh::queryable::EVAL)
                             .await?;
+
                         log::trace!("Registered on {:?}", path);
                         loop {
-                            let query = queryable.receiver().next().await.ok_or_else(|| async_std::channel::RecvError)?;
+                            let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             log::trace!("Received query {:?}", query);
-                            //let base64_req = get_request.selector.properties.get("req").cloned().ok_or_else(|| async_std::channel::RecvError)?;
-                            let base64_req = query.predicate.clone();
-                            let b64_bytes = base64::decode(base64_req).map_err(|e| ZRPCError::DeserializationError(format!("{}",e)))?;
+                            let parsed_selector = query.selector().parse_value_selector()?;
+                            let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                            let b64_bytes = base64::decode(base64_req)?;
                             let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
                             log::trace!("Received on {:?} {:?}", path, req);
 
                             let mut ser = _self.server.clone();
-                            //let q = query.clone();
-                            let p = path.clone();
-                            //log::trace!("Spawning task to respond to {:?}", req);
 
-                            match req.clone() {
+                            let encoded_resp  = match req.clone() {
                                 #(
                                     #request_ident::#camel_case_idents{#(#arg_pats),*} => {
                                         let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
                                         log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
-                                        let encoded =  zrpc::serialize::serialize_response(&resp)?;
-
-                                        let sample = zenoh::net::Sample {
-                                            res_name: p.to_string().clone(),
-                                            payload: encoded.into(),
-                                            data_info: Some(zenoh::net::protocol::proto::DataInfo {
-                                                sliced: false,
-                                                source_id: None,
-                                                source_sn: None,
-                                                first_router_id: None,
-                                                first_router_sn: None,
-                                                timestamp: None,
-                                                // timestamp: Some(uhlc::Timestamp::new(
-                                                //     Default::default(),
-                                                //     uhlc::ID::new(16, [1u8; uhlc::ID::MAX_SIZE]),
-                                                // )),
-                                                kind: None,
-                                                encoding: None,
-                                            }),
-                                        };
-                                        query.reply(sample);
-                                        log::trace!("Response {:?} sent", resp);
+                                        zrpc::serialize::serialize_response(&resp)
                                     }
                                 )*
-                            }
+                            }?;
+                            let value = zenoh::prelude::Value::new(encoded_resp.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                            let sample = zenoh::prelude::Sample::new(path.to_string(), value);
+                            query.reply_async(sample).await;
                         }
                     }
                     Box::pin( __run(self))
@@ -898,7 +881,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                             break Ok(());
                                         }
                                         zrpc::RunResultAction::StopError(e) => {
-                                            log::error!("The stopper recv got an error: {}, exiting...", e);
+                                            log::error!("The ZRPC stopper recv got an error: {}, exiting... maybe the sender was dropped?", e);
                                             break Err(e);
                                         }
 
