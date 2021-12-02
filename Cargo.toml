@@ -15,13 +15,11 @@
 
 members = [
   "zrpc",
-  "zrpc-macros",
   "znrpc-macros",
 ]
 
 exclude = [
   "zrpc-perf",
-
 ]
 
 #[profile.release]

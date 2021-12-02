@@ -1,12 +1,10 @@
 use async_std::sync::Arc;
 use async_std::task;
 use futures::prelude::*;
-use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -35,15 +33,19 @@ async fn main() {
     let rtts = Arc::new(AtomicU64::new(0));
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
-    };
-    let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
 
-    let selector = Selector::try_from(format!("/test/{}", args.size)).unwrap();
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
+    };
+    let zenoh = zenoh::open(config).await.unwrap();
+
+    let selector = format!("/test/{}", args.size);
 
     let kind = if args.mode == "peer" {
         "PR-GET"
@@ -53,9 +55,8 @@ async fn main() {
 
     let path = format!("/test/{}", args.size);
     let data = vec![0; args.size as usize];
-    ws.put(&path.try_into().unwrap(), data.into())
-        .await
-        .unwrap();
+    let value = Value::new(data.into());
+    zenoh.put(&path, value).await.unwrap();
 
     println!("MSGS,SIZE,THR,INTERVEAL,RTT_US,KIND");
     let c = count.clone();
@@ -78,7 +79,7 @@ async fn main() {
 
     while start.elapsed() < Duration::from_secs(args.duration) {
         let now_q = Instant::now();
-        let mut data_stream = ws.get(&selector).await.unwrap();
+        let mut data_stream = zenoh.get(&selector).await.unwrap();
         while data_stream.next().await.is_some() {}
         count.fetch_add(1, Ordering::AcqRel);
         rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);

@@ -1,7 +1,6 @@
 use futures::prelude::*;
-use std::convert::TryFrom;
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::{prelude::*, queryable::EVAL};
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -21,19 +20,26 @@ struct GetArgs {
 async fn main() {
     let args = GetArgs::from_args();
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
-    };
-    let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
 
-    let path = &Path::try_from("/test/eval").unwrap();
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
+    };
+
+    let zenoh = zenoh::open(config).await.unwrap();
+
+    let path = String::from("/test/eval");
 
     let data: Vec<u8> = vec![0; args.size as usize];
-    let mut get_stream = ws.register_eval(&path.into()).await.unwrap();
-    while let Some(get_request) = get_stream.next().await {
-        get_request.reply(path.clone(), data.clone().into());
+    let mut query_stream = zenoh.queryable(&path).kind(EVAL).await.unwrap();
+    while let Some(query) = query_stream.receiver().next().await {
+        let value = Value::new(data.clone().into());
+        let sample = Sample::new(path.clone(), value);
+        query.reply_async(sample).await;
     }
 }

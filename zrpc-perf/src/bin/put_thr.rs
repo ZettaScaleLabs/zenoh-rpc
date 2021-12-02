@@ -1,6 +1,5 @@
-use std::convert::TryFrom;
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -22,19 +21,23 @@ async fn main() {
 
     //println!("Args {:?}", args);
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
-    };
-    let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
 
-    let path: Path = Path::try_from("/test/thr").unwrap();
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
+    };
+    let zenoh = zenoh::open(config).await.unwrap();
+
+    let path = String::from("/test/thr");
     let data = vec![0; args.size as usize];
-    let value = Value::from(data);
+    let value = Value::new(data.into());
 
     loop {
-        ws.put(&path, value.clone()).await.unwrap();
+        zenoh.put(&path, value.clone()).await.unwrap();
     }
 }

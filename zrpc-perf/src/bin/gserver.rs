@@ -1,17 +1,12 @@
-
-
 use tonic::{transport::Server, Request, Response, Status};
 
 pub mod bench {
     tonic::include_proto!("bench");
 }
 
-
-use structopt::StructOpt;
 use bench::bencher_server::{Bencher, BencherServer};
 use bench::{BenchReply, BenchRequest};
-
-
+use structopt::StructOpt;
 
 static DEFAULT_ADDRESS: &str = "127.0.0.1:50001";
 static DEFAULT_SIZE: &str = "8";
@@ -24,7 +19,6 @@ struct ServerArgs {
     #[structopt(short, long, default_value = DEFAULT_SIZE)]
     size: u64,
 }
-
 
 #[derive(Debug, Default)]
 pub struct MyBench {
@@ -41,18 +35,15 @@ impl Bencher for MyBench {
     }
 }
 
-
-
-#[tokio::main(worker_threads=1)]
+#[tokio::main(worker_threads = 1)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let args = ServerArgs::from_args();
 
     let addr = args.address.parse()?;
 
     let data = vec![0; args.size as usize];
 
-    let greeter = MyBench{data};
+    let greeter = MyBench { data };
 
     Server::builder()
         .add_service(BencherServer::new(greeter))

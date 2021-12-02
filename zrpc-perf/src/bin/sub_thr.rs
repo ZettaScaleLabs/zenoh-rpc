@@ -1,10 +1,10 @@
 use async_std::sync::Arc;
 use async_std::task;
-use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use structopt::StructOpt;
-use zenoh::*;
+
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -13,7 +13,7 @@ static DEFAULT_DURATION: &str = "60";
 
 #[derive(StructOpt, Debug)]
 struct GetArgs {
-    /// Zenoh mode, client or peer
+    /// Config file
     #[structopt(short, long, default_value = DEFAULT_MODE)]
     mode: String,
     #[structopt(short, long)]
@@ -31,22 +31,24 @@ async fn main() {
     let args = GetArgs::from_args();
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    //Fields are the same for each test,
-    // if they do not make sense they are set to 0
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
-    };
-    let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
 
-    let path = Selector::try_from(format!("/test/thr")).unwrap();
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
+    };
+    let zenoh = zenoh::open(config).await.unwrap();
+
+    let reskey = String::from("/test/thr");
 
     let kind = if args.mode == "peer" {
-        "PP-SUB"
+        "PP-NET-SUB"
     } else {
-        "CRC-SUB"
+        "CRC-NET-SUB"
     };
     println!("MSGS,SIZE,THR,INTERVEAL,RTT_US,KIND");
     let c = count.clone();
@@ -62,15 +64,13 @@ async fn main() {
         }
     });
 
-    let subscriber = ws
-        .subscribe_with_callback(&path, move |_change| {
+    let _subscriber = zenoh
+        .subscribe(&reskey)
+        .callback(move |_sample| {
             count.fetch_add(1, Ordering::AcqRel);
         })
         .await
         .unwrap();
 
     task::sleep(Duration::from_secs(args.duration)).await;
-
-    subscriber.close().await.unwrap();
-    zenoh.close().await.unwrap();
 }

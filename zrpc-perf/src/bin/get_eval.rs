@@ -1,11 +1,10 @@
 use async_std::sync::Arc;
 use async_std::task;
 use futures::prelude::*;
-use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::*;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_INT: &str = "5";
@@ -34,10 +33,15 @@ async fn main() {
     let rtts = Arc::new(AtomicU64::new(0));
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    println!("MSGS,SIZE,THR,INTERVEAL,RTT_US,KIND");
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
+
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
     };
 
     let kind = if args.mode == "peer" {
@@ -46,11 +50,9 @@ async fn main() {
         "CRC-GET-EVAL"
     };
 
-    let zproperties = Properties::from(properties);
-    let zenoh = Zenoh::new(zproperties.into()).await.unwrap();
-    let ws = zenoh.workspace(None).await.unwrap();
+    let zenoh = zenoh::open(config).await.unwrap();
 
-    let path = Selector::try_from("/test/eval".to_string()).unwrap();
+    let path = String::from("/test/eval");
 
     let c = count.clone();
     let s = args.size;
@@ -72,7 +74,7 @@ async fn main() {
 
     while start.elapsed() < Duration::from_secs(args.duration) {
         let now_q = Instant::now();
-        let mut data_stream = ws.get(&path).await.unwrap();
+        let mut data_stream = zenoh.get(&path).await.unwrap();
         while data_stream.next().await.is_some() {}
         count.fetch_add(1, Ordering::AcqRel);
         rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);

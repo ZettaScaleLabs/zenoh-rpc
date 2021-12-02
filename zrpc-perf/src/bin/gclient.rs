@@ -19,7 +19,6 @@ static DEFAULT_DURATION: &str = "60";
 
 #[derive(StructOpt, Debug)]
 struct ClientArgs {
-
     #[structopt(short, long, default_value = DEFAULT_ADDRESS)]
     address: String,
     #[structopt(short, long, default_value = DEFAULT_SIZE)]
@@ -30,7 +29,7 @@ struct ClientArgs {
     duration: u64,
 }
 
-#[tokio::main(worker_threads=1)]
+#[tokio::main(worker_threads = 1)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ClientArgs::from_args();
 
@@ -40,8 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let kind = "GRPC-CLIENT";
 
     let mut client = BencherClient::connect(format!("http://{}", args.address)).await?;
-
-
 
     let c = count.clone();
     let s = args.size;
@@ -65,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while start.elapsed() < Duration::from_secs(args.duration) {
         let now_q = Instant::now();
-        let request = tonic::Request::new(BenchRequest{});
+        let request = tonic::Request::new(BenchRequest {});
         let _r = client.bench(request).await.unwrap();
         count.fetch_add(1, Ordering::AcqRel);
         rtts.fetch_add(now_q.elapsed().as_micros() as u64, Ordering::AcqRel);

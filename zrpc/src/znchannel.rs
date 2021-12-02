@@ -16,22 +16,20 @@ extern crate serde;
 
 use async_std::sync::Arc;
 use futures::prelude::*;
+use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
-use zenoh::net::ReplyReceiver;
-
-use zenoh::net::QueryConsolidation;
-use zenoh::net::QueryTarget;
-
-use log::trace;
+use zenoh::query::*;
+use zenoh::queryable;
+use zenoh::Session;
 
 use crate::serialize;
 use crate::zrpcresult::{ZRPCError, ZRPCResult};
 
 #[derive(Clone)]
 pub struct ZNClientChannel<Req, Resp> {
-    z: Arc<zenoh::net::Session>,
+    z: Arc<Session>,
     path: String,
     server_uuid: Option<Uuid>,
     phantom_resp: PhantomData<Resp>,
@@ -44,7 +42,7 @@ where
     Req: std::fmt::Debug + Serialize,
 {
     pub fn new(
-        z: Arc<zenoh::net::Session>,
+        z: Arc<Session>,
         path: String,
         server_uuid: Option<Uuid>,
     ) -> ZNClientChannel<Req, Resp> {
@@ -61,40 +59,46 @@ where
     /// it serialized the request on the as properties in the selector
     /// the request is first serialized as json and then encoded in base64 and
     /// passed as a property named req
-    async fn send(
-        &self,
-        zsession: &zenoh::net::Session,
-        request: &Req,
-    ) -> ZRPCResult<ReplyReceiver> {
+    async fn send(&self, request: &Req) -> ZRPCResult<ReplyReceiver> {
         let req = serialize::serialize_request(&request)?;
-        let selector = format!("{}{}/eval", self.path, self.server_uuid.unwrap(),);
-        let predicate = base64::encode(req).to_string();
-
-        //Should create the appropriate Error type and the conversions form ZError
-        trace!("Sending {:?} to  {:?} {:?}", request, selector, predicate);
-        let replies = zsession
-            .query(
-                &selector.into(),
-                &predicate,
-                QueryTarget::default(),
-                QueryConsolidation::default(),
-            )
-            .await?;
-        Ok(replies)
+        let selector = format!(
+            "{}{}/eval?(req={})",
+            self.path,
+            self.server_uuid.unwrap(),
+            base64::encode(req)
+        );
+        trace!("Sending {:?} to  {:?}", request, selector);
+        Ok(self
+            .z
+            .get(&selector)
+            .target(QueryTarget {
+                kind: queryable::EVAL,
+                target: Target::All,
+            })
+            .await?)
     }
 
     /// This function calls the eval on the server and deserialized the result
     /// if the value is not deserializable or the eval returns none it returns an IOError
     pub async fn call_fun(&self, request: Req) -> ZRPCResult<Resp> {
-        let mut data_stream = self.send(&self.z, &request).await?;
+        let mut data_receiver = self.send(&request).await?;
         //takes only one, eval goes to only one
-        let resp = data_stream.next().await;
-        log::trace!("Response from zenoh is {:?}", resp);
-        if let Some(reply) = resp {
-            let rbuf = reply.data.payload;
-            let raw_data = rbuf.to_vec();
-            log::trace!("Size of response is {}", raw_data.len());
-            Ok(serialize::deserialize_response(&raw_data)?)
+        let reply = data_receiver.next().await;
+        log::trace!("Response from zenoh is {:?}", reply);
+        if let Some(reply) = reply {
+            let sample = reply.data;
+            match sample.value.encoding.prefix {
+                //Workaround until encoding matching works
+                1 => {
+                    //Encoding::APP_OCTET_STREAM => {
+                    let raw_data = sample.value.payload.to_vec();
+                    log::trace!("Size of response is {}", raw_data.len());
+                    Ok(serialize::deserialize_response(&raw_data)?)
+                }
+                _ => Err(ZRPCError::ZenohError(
+                    "Response data is expected to be RAW in Zenoh!!".to_string(),
+                )),
+            }
         } else {
             log::error!("No data from server");
             Err(ZRPCError::ZenohError(format!(
@@ -119,24 +123,34 @@ where
         let selector = format!("{}{}/state", self.path, self.server_uuid.unwrap());
         let mut replies = self
             .z
-            .query(
-                &selector.into(),
-                "",
-                QueryTarget::default(),
-                QueryConsolidation::default(),
-            )
+            .get(&selector)
+            .target(QueryTarget {
+                kind: queryable::EVAL,
+                target: Target::All,
+            })
             .await?;
 
-        let resp = replies.next().await;
-        log::trace!("Response from zenoh is {:?}", resp);
+        let reply = replies.next().await;
+        log::trace!("Response from zenoh is {:?}", reply);
 
-        if let Some(reply) = resp {
-            let rbuf = reply.data.payload;
-            let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
-                &rbuf.to_vec(),
-            )?;
-            if ca.status == crate::types::ComponentStatus::SERVING {
-                return Ok(true);
+        if let Some(reply) = reply {
+            let sample = reply.data;
+            match sample.value.encoding.prefix {
+                //Workaround until encoding matching works
+                1 => {
+                    //Encoding::APP_OCTECT_STREAM => {
+                    let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
+                        &sample.value.payload.to_vec(),
+                    )?;
+                    if ca.status == crate::types::ComponentStatus::SERVING {
+                        return Ok(true);
+                    }
+                }
+                _ => {
+                    return Err(ZRPCError::ZenohError(
+                        "Server information is not correctly encoded".to_string(),
+                    ))
+                }
             }
         }
         Ok(false)

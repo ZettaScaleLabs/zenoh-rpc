@@ -11,17 +11,15 @@
 // Contributors:
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
+use async_std::channel::unbounded;
 use async_std::stream::StreamExt;
 use async_std::sync::{Arc, Barrier, Mutex};
-use async_std::channel::{unbounded};
 use async_std::task;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use zenoh::net::ResKey::*;
-use zenoh::net::*;
-use zenoh::Properties;
 use structopt::StructOpt;
-
+use zenoh::buf::WBuf;
+use zenoh::prelude::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -42,7 +40,7 @@ struct PingArgs {
     duration: u64,
 }
 
-type PingInfo = (u64,usize,u128);
+type PingInfo = (u64, usize, u128);
 
 #[async_std::main]
 async fn main() {
@@ -57,17 +55,19 @@ async fn main() {
         "CRC-PING"
     };
 
-    let properties = match args.peer {
-        Some(peer) => format!("mode={};peer={}", args.mode, peer),
-        None => format!("mode={}", args.mode),
+    let mut config = zenoh::config::Config::default();
+    config.set_mode(Some(args.mode.parse().unwrap())).unwrap();
+
+    match args.peer {
+        Some(peer) => {
+            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
+            config.set_peers(peers).unwrap();
+        }
+        None => (),
     };
-    let zproperties = Properties::from(properties);
+    let session = Arc::new(zenoh::open(config).await.unwrap());
 
-    let session = open(zproperties.into()).await.unwrap();
-    let session = Arc::new(session);
-
-
-    let (s,r) = unbounded::<PingInfo>();
+    let (s, r) = unbounded::<PingInfo>();
 
     // The hashmap with the pings
     let pending = Arc::new(Mutex::new(HashMap::<u64, Instant>::new()));
@@ -78,56 +78,46 @@ async fn main() {
     let c_session = session.clone();
     task::spawn(async move {
         // The resource to wait the response back
-        let reskey_pong = RId(c_session
-            .declare_resource(&RName("/test/pong".to_string()))
-            .await
-            .unwrap());
+        let reskey_pong = String::from("/test/pong");
 
-        let sub_info = SubInfo {
-            reliability: Reliability::Reliable,
-            mode: SubMode::Push,
-            period: None,
-        };
-        let mut sub = c_session
-            .declare_subscriber(&reskey_pong, &sub_info)
-            .await
-            .unwrap();
+        let mut sub = c_session.subscribe(&reskey_pong).await.unwrap();
 
         // Wait for the both publishers and subscribers to be declared
         c_barrier.wait().await;
         println!("SQ_NUMBER,SIZE,RTT_US,SCENARIO");
         while let Some(mut sample) = sub.receiver().next().await {
             let mut count_bytes = [0u8; 8];
-            sample.payload.read_bytes(&mut count_bytes);
+            sample.value.payload.read_bytes(&mut count_bytes);
             let count = u64::from_le_bytes(count_bytes);
             let instant = c_pending.lock().await.remove(&count).unwrap();
-            s.send((count,sample.payload.len(),instant.elapsed().as_micros())).await.unwrap();
+            s.send((
+                count,
+                sample.value.payload.len(),
+                instant.elapsed().as_micros(),
+            ))
+            .await
+            .unwrap();
             //print!("{},{},{},{}\n", count,sample.payload.len(),instant.elapsed().as_micros(),scenario);
         }
     });
 
-
     task::spawn(async move {
         loop {
             while let Ok(pi) = r.recv().await {
-                let (c,s,rtt) = pi;
-                print!("{},{},{},{}\n", c,s,rtt,scenario);
+                let (c, s, rtt) = pi;
+                print!("{},{},{},{}\n", c, s, rtt, scenario);
             }
         }
     });
 
     let d = args.duration;
     task::spawn(async move {
-         task::sleep(Duration::from_secs(d)).await;
-         std::process::exit(0);
+        task::sleep(Duration::from_secs(d)).await;
+        std::process::exit(0);
     });
 
     // The resource to publish data on
-    let reskey_ping = RId(session
-        .declare_resource(&RName("/test/ping".to_string()))
-        .await
-        .unwrap());
-    let _publ = session.declare_publisher(&reskey_ping).await.unwrap();
+    let reskey_ping = String::from("/test/ping");
 
     // Wait for the both publishers and subscribers to be declared
     barrier.wait().await;
@@ -141,17 +131,12 @@ async fn main() {
         data.write_bytes(&count_bytes);
         data.write_bytes(&payload);
 
-        let data: ZBuf = data.into();
+        let value = Value::new(data.into());
 
         pending.lock().await.insert(count, Instant::now());
         session
-            .write_ext(
-                &reskey_ping,
-                data,
-                encoding::DEFAULT,
-                data_kind::DEFAULT,
-                CongestionControl::Block, // Make sure to not drop messages because of congestion control
-            )
+            .put(&reskey_ping, value)
+            .congestion_control(zenoh::publication::CongestionControl::Block) // Make sure to not drop messages because of congestion control
             .await
             .unwrap();
 
