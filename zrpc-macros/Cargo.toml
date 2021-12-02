@@ -1,12 +1,9 @@
 [package]
 name = "zrpc-macros"
 version = "0.3.0-alpha1"
-repository = "https://github.com/eclipse-fog05/fog05"
-homepage = "http://fog05.io"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 edition = "2018"
 license = " EPL-2.0 OR Apache-2.0"
-description = "fog05: The End-to-End Compute, Storage and Networking Virtualisation solution."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # To build with debug on macros: RUSTFLAGS="-Z macro-backtrace"
@@ -19,7 +16,7 @@ quote = "1.0.2"
 proc-macro2 = "1.0.6"
 serde_derive = "1.0.55"
 serde = { version = "1.0.55", features = ["derive"] }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "branch_0.5.0-beta.9" }
 zrpc = {path = "../zrpc"}
 base64 = "0.13.0"
 log = "0.4.11"
