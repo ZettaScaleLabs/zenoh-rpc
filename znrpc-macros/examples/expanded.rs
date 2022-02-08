@@ -278,8 +278,8 @@ where
                     .ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
 
                 log::debug!("Received query {:?}", query);
-
-                let parsed_selector = query.selector().parse_value_selector()?;
+                let selector = query.selector();
+                let parsed_selector = selector.parse_value_selector()?;
                 let base64_req = parsed_selector
                     .properties
                     .get("req")

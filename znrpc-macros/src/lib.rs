@@ -810,7 +810,8 @@ impl<'a> ZNServiceGenerator<'a> {
                         loop {
                             let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             log::trace!("Received query {:?}", query);
-                            let parsed_selector = query.selector().parse_value_selector()?;
+                            let query_selector = query.selector();
+                            let parsed_selector = query_selector.parse_value_selector()?;
                             let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             let b64_bytes = base64::decode(base64_req)?;
                             let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
