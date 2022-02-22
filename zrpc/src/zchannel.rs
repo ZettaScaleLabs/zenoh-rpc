@@ -19,6 +19,7 @@ use futures::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
+use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::query::{Reply, ReplyReceiver};
 use zenoh::Session;
 
@@ -85,7 +86,7 @@ where
                 //Workaround until encoding matching works
                 1 => {
                     //Encoding::APP_OCTET_STREAM => {
-                    let raw_data = sample.value.payload.to_vec();
+                    let raw_data = sample.value.payload.contiguous().to_vec();
                     log::trace!("Size of response is {}", raw_data.len());
                     Ok(serialize::deserialize_response(&raw_data)?)
                 }
@@ -125,7 +126,7 @@ where
             //Workaround until encoding matching works
             1 => {
                 //Encoding::APP_OCTET_STREAM => {
-                let raw_data = sample.value.payload.to_vec();
+                let raw_data = sample.value.payload.contiguous().to_vec();
                 log::trace!("Size of state is {}", raw_data.len());
                 let cs = serialize::deserialize_state::<super::ComponentState>(&raw_data)?;
                 let selector = format!("/@/router/{}", String::from(&cs.routerid));
@@ -147,7 +148,7 @@ where
                             "Size of Zenoh router state is {}",
                             rsample.value.payload.len()
                         );
-                        let sv = String::from_utf8(rsample.value.payload.to_vec())?;
+                        let sv = String::from_utf8(rsample.value.payload.contiguous().to_vec())?;
                         let ri = serde_json::from_str::<super::types::ZRouterInfo>(&sv)?;
                         let mut it = ri.sessions.iter();
                         let f = it.find(|&x| x.peer == String::from(&cs.peerid).to_uppercase());

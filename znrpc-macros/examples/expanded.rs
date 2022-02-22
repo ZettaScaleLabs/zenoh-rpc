@@ -14,6 +14,7 @@ use async_std::task;
 use std::str;
 use std::time::Duration;
 use uuid::Uuid;
+use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::Session;
 
 use serde::{Deserialize, Serialize};
@@ -506,7 +507,7 @@ impl HelloClient {
                     1 => {
                         //Encoding::APP_OCTECT_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                            &sample.value.payload.to_vec(),
+                            &sample.value.payload.contiguous().to_vec(),
                         )?;
                         servers.push(ca.uuid);
                     }
@@ -545,7 +546,7 @@ impl HelloClient {
                     1 => {
                         //Encoding::APP_OCTECT_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                            &sample.value.payload.to_vec(),
+                            &sample.value.payload.contiguous().to_vec(),
                         )?;
                         servers.push(ca);
                     }
@@ -590,8 +591,9 @@ impl HelloClient {
 
             match sample.value.encoding.prefix {
                 5 => {
-                    let ri =
-                        zrpc::serialize::deserialize_router_info(&sample.value.payload.to_vec())?;
+                    let ri = zrpc::serialize::deserialize_router_info(
+                        &sample.value.payload.contiguous().to_vec(),
+                    )?;
                     let r: Vec<Uuid> = servers
                         .into_iter()
                         .filter_map(|ci| {

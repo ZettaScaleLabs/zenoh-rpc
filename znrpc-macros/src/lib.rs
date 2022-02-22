@@ -1053,6 +1053,8 @@ impl<'a> ZNServiceGenerator<'a> {
                 {
                     async move {
                         use futures::prelude::*;
+                        use zenoh::net::protocol::io::SplitBuffer;
+
                         let selector = format!("{}*/state",#eval_path);
                         log::trace!("Find servers selector {}", selector);
                         let mut servers = Vec::new();
@@ -1064,7 +1066,7 @@ impl<'a> ZNServiceGenerator<'a> {
                             match sample.value.encoding.prefix { // Workaround
                                 1 => {
                                         //Encoding::APP_OCTECT_STREAM => {
-                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.to_vec())?;
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
                                         servers.push(ca.uuid);
                                     }
                                 _ => {
@@ -1085,6 +1087,8 @@ impl<'a> ZNServiceGenerator<'a> {
                 {
                     async move {
                         use futures::prelude::*;
+                        use zenoh::net::protocol::io::SplitBuffer;
+
                         let selector = format!("{}*/state",#eval_path);
                         log::trace!("Find servers selector {}", selector);
                         let mut servers = Vec::new();
@@ -1096,7 +1100,7 @@ impl<'a> ZNServiceGenerator<'a> {
                             match sample.value.encoding.prefix { // Workaround
                                 1 => {
                                         //Encoding::APP_OCTECT_STREAM => {
-                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.to_vec())?;
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
                                         servers.push(ca);
                                     }
                                 _ => {
@@ -1117,6 +1121,7 @@ impl<'a> ZNServiceGenerator<'a> {
                 {
                     async move {
                         use futures::prelude::*;
+                        use zenoh::net::protocol::io::SplitBuffer;
 
 
                         let servers = Self::find_servers_info(async_std::sync::Arc::clone(&z)).await?;
@@ -1151,7 +1156,7 @@ impl<'a> ZNServiceGenerator<'a> {
 
                         match sample.value.encoding.prefix {
                             5 => {
-                                let ri = zrpc::serialize::deserialize_router_info(&sample.value.payload.to_vec())?;
+                                let ri = zrpc::serialize::deserialize_router_info(&sample.value.payload.contiguous().to_vec())?;
                                 let r: Vec<Uuid> = servers
                                     .into_iter()
                                     .filter_map(|ci| {

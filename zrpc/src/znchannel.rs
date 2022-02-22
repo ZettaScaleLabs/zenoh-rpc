@@ -20,6 +20,7 @@ use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
+use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::query::*;
 use zenoh::queryable;
 use zenoh::Session;
@@ -91,7 +92,7 @@ where
                 //Workaround until encoding matching works
                 1 => {
                     //Encoding::APP_OCTET_STREAM => {
-                    let raw_data = sample.value.payload.to_vec();
+                    let raw_data = sample.value.payload.contiguous().to_vec();
                     log::trace!("Size of response is {}", raw_data.len());
                     Ok(serialize::deserialize_response(&raw_data)?)
                 }
@@ -140,7 +141,7 @@ where
                 1 => {
                     //Encoding::APP_OCTECT_STREAM => {
                     let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
-                        &sample.value.payload.to_vec(),
+                        &sample.value.payload.contiguous().to_vec(),
                     )?;
                     if ca.status == crate::types::ComponentStatus::SERVING {
                         return Ok(true);
