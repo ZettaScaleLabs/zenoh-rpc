@@ -502,10 +502,8 @@ impl HelloClient {
 
             while let Some(d) = replies.next().await {
                 let sample = d.data;
-                match sample.value.encoding.prefix {
-                    // Workaround
-                    1 => {
-                        //Encoding::APP_OCTECT_STREAM => {
+                match sample.value.encoding {
+                    zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
                             &sample.value.payload.contiguous().to_vec(),
                         )?;
@@ -541,10 +539,8 @@ impl HelloClient {
 
             while let Some(d) = replies.next().await {
                 let sample = d.data;
-                match sample.value.encoding.prefix {
-                    // Workaround
-                    1 => {
-                        //Encoding::APP_OCTECT_STREAM => {
+                match sample.value.encoding {
+                    zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
                             &sample.value.payload.contiguous().to_vec(),
                         )?;
@@ -589,8 +585,8 @@ impl HelloClient {
             let router_data = rdata.remove(0);
             let sample = router_data.data;
 
-            match sample.value.encoding.prefix {
-                5 => {
+            match sample.value.encoding {
+                zenoh::prelude::Encoding::APP_JSON => {
                     let ri = zrpc::serialize::deserialize_router_info(
                         &sample.value.payload.contiguous().to_vec(),
                     )?;

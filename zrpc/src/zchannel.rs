@@ -20,6 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
 use zenoh::net::protocol::io::SplitBuffer;
+use zenoh::prelude::Encoding;
 use zenoh::query::{Reply, ReplyReceiver};
 use zenoh::Session;
 
@@ -82,10 +83,8 @@ where
         log::trace!("Response from zenoh is {:?}", reply);
         if let Some(reply) = reply {
             let sample = reply.data;
-            match sample.value.encoding.prefix {
-                //Workaround until encoding matching works
-                1 => {
-                    //Encoding::APP_OCTET_STREAM => {
+            match sample.value.encoding {
+                Encoding::APP_OCTET_STREAM => {
                     let raw_data = sample.value.payload.contiguous().to_vec();
                     log::trace!("Size of response is {}", raw_data.len());
                     Ok(serialize::deserialize_response(&raw_data)?)
@@ -122,10 +121,8 @@ where
 
         let reply = idata.remove(0);
         let sample = reply.data;
-        match sample.value.encoding.prefix {
-            //Workaround until encoding matching works
-            1 => {
-                //Encoding::APP_OCTET_STREAM => {
+        match sample.value.encoding {
+            Encoding::APP_OCTET_STREAM => {
                 let raw_data = sample.value.payload.contiguous().to_vec();
                 log::trace!("Size of state is {}", raw_data.len());
                 let cs = serialize::deserialize_state::<super::ComponentState>(&raw_data)?;
@@ -140,10 +137,8 @@ where
 
                 let rreply = rdata.remove(0);
                 let rsample = rreply.data;
-                match rsample.value.encoding.prefix {
-                    //Workaround until encoding matching works
-                    5 => {
-                        //Encoding::APP_JSON => {
+                match rsample.value.encoding {
+                    Encoding::APP_JSON => {
                         log::trace!(
                             "Size of Zenoh router state is {}",
                             rsample.value.payload.len()
