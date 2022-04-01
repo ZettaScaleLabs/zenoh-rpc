@@ -82,7 +82,7 @@ where
         let reply = data_receiver.next().await;
         log::trace!("Response from zenoh is {:?}", reply);
         if let Some(reply) = reply {
-            let sample = reply.data;
+            let sample = reply.sample;
             match sample.value.encoding {
                 Encoding::APP_OCTET_STREAM => {
                     let raw_data = sample.value.payload.contiguous().to_vec();
@@ -120,7 +120,7 @@ where
         }
 
         let reply = idata.remove(0);
-        let sample = reply.data;
+        let sample = reply.sample;
         match sample.value.encoding {
             Encoding::APP_OCTET_STREAM => {
                 let raw_data = sample.value.payload.contiguous().to_vec();
@@ -136,7 +136,7 @@ where
                 }
 
                 let rreply = rdata.remove(0);
-                let rsample = rreply.data;
+                let rsample = rreply.sample;
                 match rsample.value.encoding {
                     Encoding::APP_JSON => {
                         log::trace!(

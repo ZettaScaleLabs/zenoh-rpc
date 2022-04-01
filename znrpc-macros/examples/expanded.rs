@@ -501,7 +501,7 @@ impl HelloClient {
                 .await?;
 
             while let Some(d) = replies.next().await {
-                let sample = d.data;
+                let sample = d.sample;
                 match sample.value.encoding {
                     zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
@@ -538,7 +538,7 @@ impl HelloClient {
                 .await?;
 
             while let Some(d) = replies.next().await {
-                let sample = d.data;
+                let sample = d.sample;
                 match sample.value.encoding {
                     zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
@@ -583,7 +583,7 @@ impl HelloClient {
                 return Err(ZRPCError::NotFound);
             }
             let router_data = rdata.remove(0);
-            let sample = router_data.data;
+            let sample = router_data.sample;
 
             match sample.value.encoding {
                 zenoh::prelude::Encoding::APP_JSON => {

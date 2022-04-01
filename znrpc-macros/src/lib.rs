@@ -1062,7 +1062,7 @@ impl<'a> ZNServiceGenerator<'a> {
                         let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
 
                         while let Some(d) = replies.next().await {
-                            let sample = d.data;
+                            let sample = d.sample;
                             match sample.value.encoding {
                                 zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
@@ -1095,7 +1095,7 @@ impl<'a> ZNServiceGenerator<'a> {
                         let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
 
                         while let Some(d) = replies.next().await {
-                            let sample = d.data;
+                            let sample = d.sample;
                             match sample.value.encoding {
                                 zenoh::prelude::Encoding::APP_OCTET_STREAM => {
                                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
@@ -1148,7 +1148,7 @@ impl<'a> ZNServiceGenerator<'a> {
                         }
 
                         let router_data = rdata.remove(0);
-                        let sample  = router_data.data;
+                        let sample  = router_data.sample;
 
 
 
