@@ -67,7 +67,7 @@ impl<S> ServeHello<S> {
 }
 impl<S> zrpc::ZNServe<HelloRequest> for ServeHello<S>
 where
-    S: Hello + Send + 'static,
+    S: Hello + Send + std::marker::Sync + 'static,
 {
     type Resp = HelloResponse;
     fn instance_uuid(&self) -> uuid::Uuid {
@@ -95,7 +95,7 @@ where
             async_std::task::JoinHandle<ZRPCResult<()>>,
         )>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             use futures::prelude::*;
             let zinfo = _self.z.info().await;
@@ -161,7 +161,7 @@ where
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
         async fn __initialize<S>(_self: &ServeHello<S>) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let mut ci = _self.state.write().await;
             match ci.status {
@@ -182,7 +182,7 @@ where
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
         async fn __register<S>(_self: &ServeHello<S>) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let mut ci = _self.state.write().await;
             match ci.status {
@@ -222,7 +222,7 @@ where
             async_std::task::JoinHandle<ZRPCResult<()>>,
         )>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let (s, r) = async_std::channel::bounded::<()>(1);
             let barrier = async_std::sync::Arc::new(async_std::sync::Barrier::new(2));
@@ -256,7 +256,7 @@ where
     fn run(&self) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
         async fn __run<S>(_self: &ServeHello<S>) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             use futures::prelude::*;
             let path = format!(
@@ -278,32 +278,50 @@ where
                     .await
                     .ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
 
-                log::debug!("Received query {:?}", query);
-                let selector = query.selector();
-                let parsed_selector = selector.parse_value_selector()?;
-                let base64_req = parsed_selector
-                    .properties
-                    .get("req")
-                    .ok_or(ZRPCError::MissingValue)?;
-                let b64_bytes = base64::decode(base64_req)?;
-                let req = zrpc::serialize::deserialize_request::<HelloRequest>(&b64_bytes)?;
+                async fn query_handler<S>(
+                    mut ser: S,
+                    query: zenoh::queryable::Query,
+                    path: String,
+                ) -> ZRPCResult<()>
+                where
+                    S: Hello + Send + std::marker::Sync + 'static,
+                {
+                    log::debug!("Received query {:?}", query);
+                    let selector = query.selector();
+                    let parsed_selector = selector.parse_value_selector()?;
+                    let base64_req = parsed_selector
+                        .properties
+                        .get("req")
+                        .ok_or(ZRPCError::MissingValue)?;
+                    let b64_bytes = base64::decode(base64_req)?;
+                    let req = zrpc::serialize::deserialize_request::<HelloRequest>(&b64_bytes)?;
 
-                let mut ser = _self.server.clone();
-                let encoded_resp = match req {
-                    HelloRequest::Hello { name } => {
-                        let resp = HelloResponse::Hello(ser.hello(name).await);
-                        zrpc::serialize::serialize_response(&resp)
-                    }
-                    HelloRequest::Add {} => {
-                        let resp = HelloResponse::Add(ser.add().await);
-                        zrpc::serialize::serialize_response(&resp)
-                    }
-                }?;
-                let value = zenoh::prelude::Value::new(encoded_resp.into())
-                    .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                let sample = zenoh::prelude::Sample::new(path.to_string(), value);
+                    // let mut ser = _self.server.clone();
+                    let encoded_resp = match req {
+                        HelloRequest::Hello { name } => {
+                            let resp = HelloResponse::Hello(ser.hello(name).await);
+                            zrpc::serialize::serialize_response(&resp)
+                        }
+                        HelloRequest::Add {} => {
+                            let resp = HelloResponse::Add(ser.add().await);
+                            zrpc::serialize::serialize_response(&resp)
+                        }
+                    }?;
+                    let value = zenoh::prelude::Value::new(encoded_resp.into())
+                        .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                    let sample = zenoh::prelude::Sample::new(path.to_string(), value);
 
-                query.reply_async(sample).await;
+                    Ok(query.reply_async(sample).await)
+                }
+
+                let c_ser = _self.server.clone();
+                let c_path = path.clone();
+                async_std::task::spawn(async move {
+                    match query_handler(c_ser, query, c_path).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Query handler terminated with error {}", e),
+                    }
+                });
             }
         }
 
@@ -322,7 +340,7 @@ where
             _barrier: async_std::sync::Arc<async_std::sync::Barrier>,
         ) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let ci = _self.state.read().await;
             match ci.status {
@@ -381,7 +399,7 @@ where
             _stop: async_std::channel::Sender<()>,
         ) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let mut ci = _self.state.write().await;
             match ci.status {
@@ -403,7 +421,7 @@ where
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
         async fn __unregister<S>(_self: &ServeHello<S>) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let mut ci = _self.state.write().await;
             match ci.status {
@@ -429,7 +447,7 @@ where
             _stop: async_std::channel::Sender<()>,
         ) -> ZRPCResult<()>
         where
-            S: Hello + Send + 'static,
+            S: Hello + Send + std::marker::Sync + 'static,
         {
             let mut ci = _self.state.write().await;
             match ci.status {
