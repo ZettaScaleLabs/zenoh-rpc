@@ -143,3 +143,21 @@ fn service_unavailable() {
         assert_eq!(empty, servers);
     });
 }
+
+
+#[test]
+fn empty_reply() {
+    async_std::task::block_on(async {
+        let mut config = zenoh::config::Config::default();
+        config
+            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+            .unwrap();
+        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+
+        let client = HelloClient::new(zsession.clone(), uuid::Uuid::nil());
+
+        let res = client.add().await;
+        assert!(res.is_err());
+
+    });
+}
