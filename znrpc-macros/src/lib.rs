@@ -620,7 +620,7 @@ impl<'a> ZNServiceGenerator<'a> {
 
 
             impl<S> zrpc::ZNServe<#request_ident> for #server_ident<S>
-            where S: #service_ident + Send +'static
+            where S: #service_ident + Send + std::marker::Sync +'static
             {
                 type Resp = #response_ident;
 
@@ -635,7 +635,7 @@ impl<'a> ZNServiceGenerator<'a> {
 
                     async fn __connect<S>(_self: &#server_ident<S>) -> ZRPCResult<(async_std::channel::Sender<()>, async_std::task::JoinHandle<ZRPCResult<()>>)>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         use futures::prelude::*;
                         use async_std::prelude::FutureExt;
@@ -698,7 +698,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Initialize Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __initialize<S>(_self: &#server_ident<S>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         let mut ci = _self.state.write().await;
                         match ci.status {
@@ -719,7 +719,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Register Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __register<S>(_self: &#server_ident<S>) -> ZRPCResult<()>
                     where
-                    S: #service_ident + Send + 'static,
+                    S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         let mut ci = _self.state.write().await;
                         match ci.status {
@@ -754,7 +754,7 @@ impl<'a> ZNServiceGenerator<'a> {
                         async_std::task::JoinHandle<ZRPCResult<()>>,
                     )>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                             let (s, r) = async_std::channel::bounded::<()>(1);
                             let barrier = async_std::sync::Arc::new(async_std::sync::Barrier::new(2));
@@ -795,7 +795,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Run Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __run<S>(_self: &#server_ident<S>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         use futures::prelude::*;
                         let path = format!("{}{}/eval",#eval_path, _self.instance_uuid());
@@ -809,28 +809,43 @@ impl<'a> ZNServiceGenerator<'a> {
                         log::trace!("Registered on {:?}", path);
                         loop {
                             let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                            log::trace!("Received query {:?}", query);
-                            let query_selector = query.selector();
-                            let parsed_selector = query_selector.parse_value_selector()?;
-                            let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                            let b64_bytes = base64::decode(base64_req)?;
-                            let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
-                            log::trace!("Received on {:?} {:?}", path, req);
 
-                            let mut ser = _self.server.clone();
 
-                            let encoded_resp  = match req.clone() {
-                                #(
-                                    #request_ident::#camel_case_idents{#(#arg_pats),*} => {
-                                        let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
-                                        log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
-                                        zrpc::serialize::serialize_response(&resp)
-                                    }
-                                )*
-                            }?;
-                            let value = zenoh::prelude::Value::new(encoded_resp.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                            let sample = zenoh::prelude::Sample::new(path.to_string(), value);
-                            query.reply_async(sample).await;
+                            async fn query_handler<S>(mut ser: S, query: zenoh::queryable::Query, path: String) -> ZRPCResult<()>
+                            where
+                                S: #service_ident + Send + std::marker::Sync + 'static,
+                            {
+                                log::trace!("Received query {:?}", query);
+                                let query_selector = query.selector();
+                                let parsed_selector = query_selector.parse_value_selector()?;
+                                let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                                let b64_bytes = base64::decode(base64_req)?;
+                                let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
+                                log::trace!("Received on {:?} {:?}", path, req);
+
+                                let encoded_resp  = match req.clone() {
+                                    #(
+                                        #request_ident::#camel_case_idents{#(#arg_pats),*} => {
+                                            let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
+                                            log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
+                                            zrpc::serialize::serialize_response(&resp)
+                                        }
+                                    )*
+                                }?;
+                                let value = zenoh::prelude::Value::new(encoded_resp.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                                let sample = zenoh::prelude::Sample::new(path, value);
+                                Ok(query.reply_async(sample).await)
+                            }
+
+                            let c_ser = _self.server.clone();
+                            let c_path = path.clone();
+                            async_std::task::spawn(async move {
+                                match query_handler(c_ser, query, c_path).await {
+                                    Ok(_) => (),
+                                    Err(e) => log::error!("Query handler terminated with error {}", e),
+                                }
+                            });
+
                         }
                     }
                     Box::pin( __run(self))
@@ -845,7 +860,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Serve Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __serve<S>(_self: &#server_ident<S>, _stop: async_std::channel::Receiver<()>, _barrier : async_std::sync::Arc<async_std::sync::Barrier>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         use futures::prelude::*;
                         use async_std::prelude::FutureExt;
@@ -904,7 +919,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Stop Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __stop<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         let mut ci = _self.state.write().await;
                         match ci.status {
@@ -924,7 +939,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Unregister Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __unregister<S>(_self: &#server_ident<S>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                     {
                         let mut ci = _self.state.write().await;
                         match ci.status {
@@ -943,7 +958,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     log::trace!("Disconnect Service {} Instance {}", #service_name, self.instance_uuid());
                     async fn __disconnect<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
                     where
-                        S: #service_ident + Send + 'static,
+                        S: #service_ident + Send + std::marker::Sync + 'static,
                         {
                             let mut ci = _self.state.write().await;
                             match ci.status {
