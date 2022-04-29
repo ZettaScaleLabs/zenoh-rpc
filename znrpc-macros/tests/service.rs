@@ -36,8 +36,8 @@ pub trait Hello {
 struct HelloZService {
     pub ser_name: String,
     pub counter: Arc<Mutex<u64>>,
-    pub zsession : Arc<zenoh::Session>,
-    pub my_id : uuid::Uuid,
+    pub zsession: Arc<zenoh::Session>,
+    pub my_id: uuid::Uuid,
 }
 
 #[znserver]
@@ -51,7 +51,6 @@ impl Hello for HelloZService {
         *guard += 1;
         *guard
     }
-
 
     async fn call_self(&self) -> String {
         let client = HelloClient::new(self.zsession.clone(), self.my_id);
@@ -143,7 +142,6 @@ fn service_call() {
     });
 }
 
-
 #[test]
 fn self_service_call() {
     async_std::task::block_on(async {
@@ -209,7 +207,6 @@ fn service_unavailable() {
     });
 }
 
-
 #[test]
 fn empty_reply() {
     async_std::task::block_on(async {
@@ -223,6 +220,5 @@ fn empty_reply() {
 
         let res = client.add().await;
         assert!(res.is_err());
-
     });
 }
