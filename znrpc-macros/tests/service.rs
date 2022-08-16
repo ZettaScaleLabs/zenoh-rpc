@@ -22,7 +22,7 @@ use uuid::Uuid;
 //importing the macros
 use znrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZNServe;
+use zrpc::ZServe;
 
 #[znservice(timeout_s = 60, prefix = "/lfos")]
 pub trait Hello {
@@ -77,7 +77,7 @@ fn service_discovery() {
         server.unregister().await.unwrap();
         server.disconnect(stopper).await.unwrap();
 
-        handle.await.unwrap();
+        let _ = handle.await;
     });
 }
 
@@ -125,7 +125,7 @@ fn service_call() {
         server.unregister().await.unwrap();
         server.disconnect(stopper).await.unwrap();
 
-        handle.await.unwrap();
+        let _ = handle.await;
     });
 }
 

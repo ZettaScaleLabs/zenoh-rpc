@@ -14,7 +14,7 @@ use uuid::Uuid;
 //importing the macros
 use znrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZNServe;
+use zrpc::ZServe;
 
 #[znservice(timeout_s = 60, prefix = "/lfos")]
 pub trait Hello {
@@ -109,7 +109,7 @@ async fn main() {
     server.unregister().await.unwrap();
     server.disconnect(stopper).await.unwrap();
 
-    handle.await.unwrap();
+    let _ = handle.await;
 
     // this should return an error as the server is not there
     // let hello = client.hello("client".to_string()).await;

@@ -619,7 +619,7 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
 
 
-            impl<S> zrpc::ZNServe<#request_ident> for #server_ident<S>
+            impl<S> zrpc::ZServe<#request_ident> for #server_ident<S>
             where S: #service_ident + Send +'static
             {
                 type Resp = #response_ident;
@@ -630,10 +630,16 @@ impl<'a> ZNServiceGenerator<'a> {
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn connect(&'_ self) ->
-                ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<(async_std::channel::Sender<()>, async_std::task::JoinHandle<ZRPCResult<()>>)>> + '_>> {
+                ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<(
+                    zrpc::AbortHandle,
+                    async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
+                )>> + '_>> {
                     log::trace!("Connect Service {} Instance {}", #service_name, self.instance_uuid());
 
-                    async fn __connect<S>(_self: &#server_ident<S>) -> ZRPCResult<(async_std::channel::Sender<()>, async_std::task::JoinHandle<ZRPCResult<()>>)>
+                    async fn __connect<S>(_self: &#server_ident<S>) -> ZRPCResult<(
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
+                    )>
                     where
                         S: #service_ident + Send + 'static,
                     {
@@ -657,37 +663,42 @@ impl<'a> ZNServiceGenerator<'a> {
                         let mut ci = _self.state.write().await;
                         ci.peerid = pid.clone().to_uppercase();
                         drop(ci);
-                        let (s,r) = async_std::channel::bounded::<()>(1);
 
                         let zsession = async_std::sync::Arc::clone(&_self.z);
 
                         let state = _self.state.clone();
                         let path = format!("{}{}/state",#eval_path,_self.instance_uuid());
 
-                        log::trace!("Spawning state responder task");
-                        let h = async_std::task::spawn(
-                            async move {
-                                log::trace!("Registering queryable on {:?}", path);
-                                let mut queryable = zsession.queryable(&path).kind(zenoh::queryable::EVAL).await?;
-                                log::trace!("Queryable registered on {:?}", path);
-                                let rcv_loop = async {
-                                    loop{
-                                        let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                                        let ci = state.read().await;
-                                        let data = zrpc::serialize::serialize_state(&*ci)?;
-                                        drop(ci);
+                        let run_loop = async move {
+                            let mut queryable = zsession
+                                .queryable(&path)
+                                .kind(zenoh::queryable::EVAL)
+                                .await?;
 
-                                        let value = zenoh::prelude::Value::new(data.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                                        let sample  = zenoh::prelude::Sample::new(path.to_string(), value);
-                                        log::trace!("Reply to state queryable!");
-                                        query.reply(sample);
-                                    }
-                                };
-                                log::trace!("Receiver loop started");
-                                rcv_loop.race(r.recv().map_err(|e| ZRPCError::Error(e.to_string()))).await
+                            loop {
+                                let query = queryable
+                                    .receiver()
+                                    .next()
+                                    .await
+                                    .ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                                let ci = state.read().await;
+                                let data = zrpc::serialize::serialize_state(&*ci)?;
+                                drop(ci);
+                                let value = zenoh::prelude::Value::new(data.into())
+                                    .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                                let sample = zenoh::prelude::Sample::new(path.to_string(), value);
+                                query.reply_async(sample).await;
                             }
-                        );
-                        Ok((s,h))
+                        };
+
+
+                        let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
+
+                        log::trace!("Spawning state responder task");
+                        let task_handle =
+                            async_std::task::spawn(zrpc::Abortable::new(run_loop, abort_registration));
+
+                        Ok((abort_handle, task_handle))
                     }
                     Box::pin(__connect(self))
                 }
@@ -740,8 +751,8 @@ impl<'a> ZNServiceGenerator<'a> {
                     Box<
                         dyn std::future::Future<
                                 Output = ZRPCResult<(
-                                    async_std::channel::Sender<()>,
-                                    async_std::task::JoinHandle<ZRPCResult<()>>
+                                    zrpc::AbortHandle,
+                                    async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                                 )>> + '_>>
                     {
 
@@ -750,8 +761,8 @@ impl<'a> ZNServiceGenerator<'a> {
                     async fn __start<S>(
                         _self: &#server_ident<S>,
                     ) -> ZRPCResult<(
-                        async_std::channel::Sender<()>,
-                        async_std::task::JoinHandle<ZRPCResult<()>>,
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                     )>
                     where
                         S: #service_ident + Send + 'static,
@@ -766,12 +777,16 @@ impl<'a> ZNServiceGenerator<'a> {
 
                                     let server = _self.clone();
                                     let b =  barrier.clone();
+                                    let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
 
-                                    let h = async_std::task::spawn_blocking( move || {
-                                        async_std::task::block_on(async {
-                                            server.serve(r, b).await
-                                        })
+                                    log::trace!("Spawning serving loop");
+                                    let task_handle = async_std::task::spawn_blocking(move || {
+                                        async_std::task::block_on(zrpc::Abortable::new(
+                                            async { server.serve(b).await },
+                                            abort_registration,
+                                        ))
                                     });
+
                                     log::trace!("Waiting for serving loop to be ready");
                                     barrier.wait().await;
 
@@ -780,7 +795,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                     ci.status = zrpc::ComponentStatus::SERVING;
                                     drop(ci);
 
-                                    Ok((s,h))
+                                    Ok((abort_handle, task_handle))
 
                                 }
                                 _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot start a component in a state different than REGISTERED".to_string())),
@@ -839,11 +854,10 @@ impl<'a> ZNServiceGenerator<'a> {
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn serve(
                     &self,
-                    stop: async_std::channel::Receiver<()>,
                     barrier : async_std::sync::Arc<async_std::sync::Barrier>,
                 ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Serve Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __serve<S>(_self: &#server_ident<S>, _stop: async_std::channel::Receiver<()>, _barrier : async_std::sync::Arc<async_std::sync::Barrier>) -> ZRPCResult<()>
+                    async fn __serve<S>(_self: &#server_ident<S>, _barrier : async_std::sync::Arc<async_std::sync::Barrier>) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                     {
@@ -859,31 +873,12 @@ impl<'a> ZNServiceGenerator<'a> {
 
                                 log::trace!("RPC Receiver loop started...");
                                 loop {
-                                    let run = async {
-                                        match _self.run().await {
-                                            Ok(_) => zrpc::RunResultAction::Restart(None),
-                                            Err(e) => zrpc::RunResultAction::Restart(Some(e)),
-                                        }
-                                    };
-                                    let stopper = async {
-                                        match _stop.recv().await {
-                                            Ok(_) => zrpc::RunResultAction::Stop,
-                                            Err(e) => zrpc::RunResultAction::StopError(ZRPCError::Error(format!("{}", e)))
-                                        }
-                                    };
-
-                                    match run.race(stopper).await {
-                                        zrpc::RunResultAction::Restart(e) => {
+                                    match _self.run().await {
+                                        Err(e) => {
                                             log::error!("The run loop existed with {:?}, restaring...", e);
-                                            continue;
                                         }
-                                        zrpc::RunResultAction::Stop => {
-                                            log::trace!("Received kill command, killing runner");
-                                            break Ok(());
-                                        }
-                                        zrpc::RunResultAction::StopError(e) => {
-                                            log::error!("The ZRPC stopper recv got an error: {}, exiting... maybe the sender was dropped?", e);
-                                            break Err(e);
+                                        Ok(_) => {
+                                            log::warn!("The run loop existed with unit restaring...");
                                         }
 
                                     }
@@ -892,17 +887,17 @@ impl<'a> ZNServiceGenerator<'a> {
                             _ => Err(ZRPCError::StateTransitionNotAllowed("State is not WORK, serve called directly? serve is called by calling work!".to_string())),
                         }
                     }
-                    let res  = __serve(self, stop, barrier);
+                    let res  = __serve(self, barrier);
                     Box::pin(res)
                 }
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn stop(
                     &self,
-                    stop: async_std::channel::Sender<()>,
+                    stop: zrpc::AbortHandle,
                 ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Stop Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __stop<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
+                    async fn __stop<S>(_self: &#server_ident<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                     {
@@ -911,7 +906,7 @@ impl<'a> ZNServiceGenerator<'a> {
                             zrpc::ComponentStatus::SERVING => {
                                 ci.status = zrpc::ComponentStatus::REGISTERED;
                                 drop(ci);
-                                Ok(_stop.send(()).await?)
+                                Ok(_stop.abort())
                             },
                             _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot stop a component in a state different than WORK".to_string())),
                         }
@@ -939,9 +934,9 @@ impl<'a> ZNServiceGenerator<'a> {
                 }
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
-                fn disconnect(&self, stop: async_std::channel::Sender<()>) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
+                fn disconnect(&self, stop: zrpc::AbortHandle,) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Disconnect Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __disconnect<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
+                    async fn __disconnect<S>(_self: &#server_ident<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                         {
@@ -950,7 +945,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                 zrpc::ComponentStatus::HALTED => {
                                     ci.status = zrpc::ComponentStatus::HALTED;
                                     drop(ci);
-                                    Ok(_stop.send(()).await?)
+                                    Ok(_stop.abort())
                                 },
                                 _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot disconnect a component in a state different than HALTED".to_string())),
                             }
