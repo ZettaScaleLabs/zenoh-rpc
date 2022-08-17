@@ -18,9 +18,6 @@ pub use futures::stream::{AbortHandle, AbortRegistration, Abortable, Aborted};
 pub mod zchannel;
 pub use zchannel::ZClientChannel;
 
-pub mod znchannel;
-pub use znchannel::ZNClientChannel;
-
 pub mod types;
 pub use types::*;
 

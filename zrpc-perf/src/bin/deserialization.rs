@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 use std::str;
 use uuid::Uuid;
-use znrpc_macros::znservice;
+use zrpc_macros::znservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 
 static DEFAULT_INT: &str = "5";

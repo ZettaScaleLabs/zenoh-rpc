@@ -12,7 +12,7 @@ use zenoh::prelude::*;
 
 use std::str;
 use uuid::Uuid;
-use znrpc_macros::{znserver, znservice};
+use zrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZNServe;
 

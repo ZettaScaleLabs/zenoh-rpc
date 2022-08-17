@@ -439,14 +439,14 @@ pub enum HelloResponse {
 
 #[allow(unused)]
 #[derive(Clone, Debug)]
-pub struct HelloClient<C = zrpc::ZNClientChannel<HelloRequest, HelloResponse>> {
+pub struct HelloClient<C = zrpc::ZClientChannel<HelloRequest, HelloResponse>> {
     ch: C,
     server_uuid: Uuid,
 }
 
 impl HelloClient {
     pub fn new(z: async_std::sync::Arc<zenoh::Session>, instance_id: uuid::Uuid) -> HelloClient {
-        let new_client = zrpc::ZNClientChannel::new(
+        let new_client = zrpc::ZClientChannel::new(
             z,
             "/znservice/Hello/2967c40b-a9a4-4330-b5f6-e0315b2356a9/".to_string(),
             Some(instance_id),

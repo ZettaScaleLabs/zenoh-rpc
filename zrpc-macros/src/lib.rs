@@ -1008,7 +1008,7 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
             #[allow(unused)]
             #[derive(Clone, Debug)]
-            #vis struct #client_ident<C = zrpc::ZNClientChannel<#request_ident, #response_ident>>{
+            #vis struct #client_ident<C = zrpc::ZClientChannel<#request_ident, #response_ident>>{
                 ch : C,
                 server_uuid : Uuid,
             }
@@ -1030,7 +1030,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     z : async_std::sync::Arc<zenoh::Session>,
                     instance_id : uuid::Uuid
                 ) -> #client_ident {
-                        let new_client = zrpc::ZNClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
+                        let new_client = zrpc::ZClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
                         #client_ident{
                             ch : new_client,
                             server_uuid : instance_id,

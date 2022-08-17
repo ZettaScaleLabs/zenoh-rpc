@@ -12,9 +12,9 @@ use std::time::Duration;
 use uuid::Uuid;
 
 //importing the macros
-use znrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZServe;
+use zrpc_macros::{znserver, znservice};
 
 #[znservice(timeout_s = 60, prefix = "/lfos")]
 pub trait Hello {
