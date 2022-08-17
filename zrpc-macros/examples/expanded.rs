@@ -1,3 +1,16 @@
+/*********************************************************************************
+* Copyright (c) 2022 ZettaScale Technology
+*
+* This program and the accompanying materials are made available under the
+* terms of the Eclipse Public License 2.0 which is available at
+* http://www.eclipse.org/legal/epl-2.0, or the Apache Software License 2.0
+* which is available at https://www.apache.org/licenses/LICENSE-2.0.
+*
+* SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+* Contributors:
+*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+*********************************************************************************/
+
 // #![feature(prelude_import)]
 #![allow(clippy::manual_async_fn)]
 #![allow(clippy::large_enum_variant)]
@@ -7,7 +20,6 @@ extern crate std;
 
 use std::prelude::v1::*;
 
-use async_std::prelude::FutureExt;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
 
@@ -19,7 +31,7 @@ use zenoh::Session;
 
 use serde::{Deserialize, Serialize};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::{RunResultAction, ZNServe};
+use zrpc::ZServe;
 
 pub trait Hello: Clone {
     fn hello(
@@ -65,7 +77,7 @@ impl<S> ServeHello<S> {
         }
     }
 }
-impl<S> zrpc::ZNServe<HelloRequest> for ServeHello<S>
+impl<S> zrpc::ZServe<HelloRequest> for ServeHello<S>
 where
     S: Hello + Send + 'static,
 {
@@ -82,8 +94,8 @@ where
         Box<
             dyn std::future::Future<
                     Output = ZRPCResult<(
-                        async_std::channel::Sender<()>,
-                        async_std::task::JoinHandle<ZRPCResult<()>>,
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                     )>,
                 > + '_,
         >,
@@ -91,8 +103,8 @@ where
         async fn __connect<S>(
             _self: &ServeHello<S>,
         ) -> ZRPCResult<(
-            async_std::channel::Sender<()>,
-            async_std::task::JoinHandle<ZRPCResult<()>>,
+            zrpc::AbortHandle,
+            async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
         )>
         where
             S: Hello + Send + 'static,
@@ -124,34 +136,34 @@ where
                 _self.instance_uuid()
             );
 
-            let h = async_std::task::spawn(async move {
+            let run_loop = async move {
                 let mut queryable = zsession
                     .queryable(&path)
                     .kind(zenoh::queryable::EVAL)
                     .await?;
 
-                let rcv_loop = async {
-                    loop {
-                        let query = queryable
-                            .receiver()
-                            .next()
-                            .await
-                            .ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                        let ci = state.read().await;
-                        let data = zrpc::serialize::serialize_state(&*ci)?;
-                        drop(ci);
-                        let value = zenoh::prelude::Value::new(data.into())
-                            .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                        let sample = zenoh::prelude::Sample::new(path.to_string(), value);
-                        query.reply_async(sample).await;
-                    }
-                };
+                loop {
+                    let query = queryable
+                        .receiver()
+                        .next()
+                        .await
+                        .ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                    let ci = state.read().await;
+                    let data = zrpc::serialize::serialize_state(&*ci)?;
+                    drop(ci);
+                    let value = zenoh::prelude::Value::new(data.into())
+                        .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                    let sample = zenoh::prelude::Sample::new(path.to_string(), value);
+                    query.reply_async(sample).await;
+                }
+            };
 
-                rcv_loop
-                    .race(r.recv().map_err(|e| ZRPCError::Error(format!("{}", e))))
-                    .await
-            });
-            Ok((s, h))
+            let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
+
+            let task_handle =
+                async_std::task::spawn(zrpc::Abortable::new(run_loop, abort_registration));
+
+            Ok((abort_handle, task_handle))
         }
         Box::pin(__connect(self))
     }
@@ -209,8 +221,8 @@ where
         Box<
             dyn std::future::Future<
                     Output = ZRPCResult<(
-                        async_std::channel::Sender<()>,
-                        async_std::task::JoinHandle<ZRPCResult<()>>,
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                     )>,
                 > + '_,
         >,
@@ -218,13 +230,12 @@ where
         async fn __start<S>(
             _self: &ServeHello<S>,
         ) -> ZRPCResult<(
-            async_std::channel::Sender<()>,
-            async_std::task::JoinHandle<ZRPCResult<()>>,
+            zrpc::AbortHandle,
+            async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
         )>
         where
             S: Hello + Send + 'static,
         {
-            let (s, r) = async_std::channel::bounded::<()>(1);
             let barrier = async_std::sync::Arc::new(async_std::sync::Barrier::new(2));
             let ci = _self.state.read().await;
             match ci.status {
@@ -233,8 +244,14 @@ where
 
                     let server = _self.clone();
                     let b = barrier.clone();
-                    let h = async_std::task::spawn_blocking(move || {
-                        async_std::task::block_on(async { server.serve(r, b).await })
+
+                    let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
+
+                    let task_handle = async_std::task::spawn_blocking(move || {
+                        async_std::task::block_on(zrpc::Abortable::new(
+                            async { server.serve(b).await },
+                            abort_registration,
+                        ))
                     });
 
                     barrier.wait().await;
@@ -243,7 +260,7 @@ where
                     ci.status = zrpc::ComponentStatus::SERVING;
                     drop(ci);
 
-                    Ok((s, h))
+                    Ok((abort_handle, task_handle))
                 }
                 _ => Err(ZRPCError::StateTransitionNotAllowed(
                     "Cannot start a component in a state different than REGISTERED".to_string(),
@@ -313,12 +330,10 @@ where
     #[allow(clippy::type_complexity, clippy::manual_async_fn)]
     fn serve(
         &self,
-        stop: async_std::channel::Receiver<()>,
         barrier: async_std::sync::Arc<async_std::sync::Barrier>,
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
         async fn __serve<S>(
             _self: &ServeHello<S>,
-            _stop: async_std::channel::Receiver<()>,
             _barrier: async_std::sync::Arc<async_std::sync::Barrier>,
         ) -> ZRPCResult<()>
         where
@@ -331,33 +346,12 @@ where
                     _barrier.wait().await;
 
                     loop {
-                        let run = async {
-                            match _self.run().await {
-                                Ok(_) => RunResultAction::Restart(None),
-                                Err(e) => RunResultAction::Restart(Some(e)),
+                        match _self.run().await {
+                            Err(e) => {
+                                log::error!("The run loop existed with {e:?}, restaring...");
                             }
-                        };
-                        let stopper = async {
-                            match _stop.recv().await {
-                                Ok(_) => RunResultAction::Stop,
-                                Err(e) => {
-                                    RunResultAction::StopError(ZRPCError::Error(format!("{}", e)))
-                                }
-                            }
-                        };
-
-                        match run.race(stopper).await {
-                            RunResultAction::Restart(e) => {
-                                log::error!("The run loop existed with {:?}, restaring...", e);
-                                continue;
-                            }
-                            RunResultAction::Stop => {
-                                log::trace!("Received kill command, killing runner");
-                                break Ok(());
-                            }
-                            RunResultAction::StopError(e) => {
-                                log::error!("The ZRPC stopper recv got an error: {}, exiting... maybe the sender was dropped?", e);
-                                break Err(e);
+                            Ok(_) => {
+                                log::warn!("The run loop existed with unit restaring...");
                             }
                         }
                     }
@@ -368,18 +362,16 @@ where
                 )),
             }
         }
-        let res = __serve(self, stop, barrier);
+        let res = __serve(self, barrier);
         Box::pin(res)
     }
+
     #[allow(clippy::type_complexity, clippy::manual_async_fn)]
     fn stop(
         &self,
-        stop: async_std::channel::Sender<()>,
+        stop: zrpc::AbortHandle,
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
-        async fn __stop<S>(
-            _self: &ServeHello<S>,
-            _stop: async_std::channel::Sender<()>,
-        ) -> ZRPCResult<()>
+        async fn __stop<S>(_self: &ServeHello<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
         where
             S: Hello + Send + 'static,
         {
@@ -388,7 +380,7 @@ where
                 zrpc::ComponentStatus::SERVING => {
                     ci.status = zrpc::ComponentStatus::REGISTERED;
                     drop(ci);
-                    Ok(_stop.send(()).await?)
+                    Ok(_stop.abort())
                 }
                 _ => Err(ZRPCError::StateTransitionNotAllowed(
                     "Cannot stop a component in a state different than WORK".to_string(),
@@ -422,12 +414,9 @@ where
     #[allow(clippy::type_complexity, clippy::manual_async_fn)]
     fn disconnect(
         &self,
-        stop: async_std::channel::Sender<()>,
+        stop: zrpc::AbortHandle,
     ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
-        async fn __disconnect<S>(
-            _self: &ServeHello<S>,
-            _stop: async_std::channel::Sender<()>,
-        ) -> ZRPCResult<()>
+        async fn __disconnect<S>(_self: &ServeHello<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
         where
             S: Hello + Send + 'static,
         {
@@ -436,7 +425,7 @@ where
                 zrpc::ComponentStatus::HALTED => {
                     ci.status = zrpc::ComponentStatus::HALTED;
                     drop(ci);
-                    Ok(_stop.send(()).await?)
+                    Ok(_stop.abort())
                 }
                 _ => Err(ZRPCError::StateTransitionNotAllowed(
                     "Cannot disconnect a component in a state different than HALTED".to_string(),
@@ -463,14 +452,14 @@ pub enum HelloResponse {
 
 #[allow(unused)]
 #[derive(Clone, Debug)]
-pub struct HelloClient<C = zrpc::ZNClientChannel<HelloRequest, HelloResponse>> {
+pub struct HelloClient<C = zrpc::ZClientChannel<HelloRequest, HelloResponse>> {
     ch: C,
     server_uuid: Uuid,
 }
 
 impl HelloClient {
     pub fn new(z: async_std::sync::Arc<zenoh::Session>, instance_id: uuid::Uuid) -> HelloClient {
-        let new_client = zrpc::ZNClientChannel::new(
+        let new_client = zrpc::ZClientChannel::new(
             z,
             "/znservice/Hello/2967c40b-a9a4-4330-b5f6-e0315b2356a9/".to_string(),
             Some(instance_id),
@@ -748,6 +737,6 @@ async fn main() {
         server.stop(s).await.unwrap();
         server.unregister().await.unwrap();
         server.disconnect(stopper).await.unwrap();
-        handle.await.unwrap();
+        handle.await.unwrap().unwrap();
     }
 }

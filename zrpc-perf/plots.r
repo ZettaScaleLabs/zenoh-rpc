@@ -1,3 +1,17 @@
+#
+# Copyright (c) 2022 ZettaScale Technology
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+# which is available at https://www.apache.org/licenses/LICENSE-2.0.
+#
+# SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+#
+# Contributors:
+#   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+#
+
 library(ggplot2)
 library(cowplot)
 library(tidyverse)
@@ -27,7 +41,7 @@ data_files <- c();
  for(ld in logdir) {
    data_files <- c(data_files, list.files(ld, pattern = "*.csv", full.names=TRUE));
 }
- 
+
 raw_data <- data_files %>%
    map_df(~ read_dir(.))
 
@@ -58,14 +72,14 @@ data <- data %>% filter(KIND!="ZNRPC-RESP-SER" & KIND!="ZNRPC-RESP-DE")
 
 # p_msgs <- ggplot(data=data, aes(x=factor(SIZE), y=MEAN_MSGS, fill=KIND)) +
 #   geom_bar(stat="identity", position="dodge") + scale_y_log10()
-# 
+#
 # plot(p_msgs)
-# 
+#
 # p_rtt <- ggplot(data=data, aes(x=factor(SIZE), y=MEAN_RTT, fill=KIND)) +
 #   geom_bar(stat="identity", position="dodge") + scale_y_log10()
-# 
+#
 # plot(p_rtt)
-# 
+#
 # ggsave("zrpc-msgs.pdf",plot = p_msgs, width = 10, height = 10, limitsize = TRUE);
 # ggsave("zrpc-rtt.pdf",plot = p_rtt, width = 10, height = 10, limitsize = TRUE);
 
@@ -111,19 +125,19 @@ plot(p_rtt)
 #plot(p_rtt_median)
 
 
-#dist_data <- raw_data %>% filter(SIZE==8)  %>% filter(KIND=="QUERY" | KIND=="QUERY-EVAL" | KIND=="P2P-QUERY-EVAL")  
+#dist_data <- raw_data %>% filter(SIZE==8)  %>% filter(KIND=="QUERY" | KIND=="QUERY-EVAL" | KIND=="P2P-QUERY-EVAL")
 
 # dist_data <- raw_data %>% filter(SIZE==8)
-# 
-# 
+#
+#
 # p_rtt_dist<-ggplot(data=dist_data, aes(x=RTT_US, colour=KIND, group=KIND)) +
 #   geom_density() +
 #   #scale_y_log10() +
 #   ggtitle("zenoh rtt density plot 8 byte") +
 #   xlab("RTT µS") + ylab("Probability")
 # plot(p_rtt_dist)
-# 
-# cmp_data <- data %>% filter(KIND=="PP-ZNRPC" |  KIND=="PP-QUERY-EVAL" | KIND=="GRPC-CLIENT" ) 
+#
+# cmp_data <- data %>% filter(KIND=="PP-ZNRPC" |  KIND=="PP-QUERY-EVAL" | KIND=="GRPC-CLIENT" )
 # p_msgs_cmp<-ggplot(data=cmp_data, aes(x=factor(SIZE), y=MEAN_MSGS, colour=KIND, group=KIND)) +
 #   geom_point(size=2) +
 #   geom_line() +
@@ -133,8 +147,8 @@ plot(p_rtt)
 #   ggtitle("zrpc zenoh comparison msg/s localhost") +
 #   xlab("Payload size") + ylab("msg/s")
 # plot(p_msgs_cmp)
-# 
-# 
+#
+#
 
 ggsave("msgs-comparison.pdf",plot = p_msgs, width = 10, height = 10, limitsize = TRUE);
 ggsave("thr-comparison.pdf",plot = p_thr, width = 10, height = 10, limitsize = TRUE);

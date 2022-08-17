@@ -1,5 +1,5 @@
 /*********************************************************************************
-* Copyright (c) 2018,2020 ADLINK Technology Inc.
+* Copyright (c) 2022 ZettaScale Technology
 *
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
@@ -8,7 +8,7 @@
 *
 * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 * Contributors:
-*   ADLINK fog05 team, <fog05@adlink-labs.tech>
+*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
 extern crate base64;
@@ -16,15 +16,15 @@ extern crate serde;
 
 use async_std::sync::Arc;
 use futures::prelude::*;
+use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 use uuid::Uuid;
 use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::prelude::Encoding;
-use zenoh::query::{Reply, ReplyReceiver};
+use zenoh::query::*;
+use zenoh::queryable;
 use zenoh::Session;
-
-use log::trace;
 
 use crate::serialize;
 use crate::zrpcresult::{ZRPCError, ZRPCResult};
@@ -64,14 +64,20 @@ where
     async fn send(&self, request: &Req) -> ZRPCResult<ReplyReceiver> {
         let req = serialize::serialize_request(&request)?;
         let selector = format!(
-            "{}/{}/eval?(req={})",
+            "{}{}/eval?(req={})",
             self.path,
             self.server_uuid.unwrap(),
             base64::encode(req)
         );
-        //Should create the appropriate Error type and the conversions form ZError
         trace!("Sending {:?} to  {:?}", request, selector);
-        Ok(self.z.get(&selector).await?)
+        Ok(self
+            .z
+            .get(&selector)
+            .target(QueryTarget {
+                kind: queryable::EVAL,
+                target: Target::All,
+            })
+            .await?)
     }
 
     /// This function calls the eval on the server and deserialized the result
@@ -110,61 +116,41 @@ where
             return Ok(false);
         }
 
-        let selector = format!("{}/{}/state", self.path, self.server_uuid.unwrap());
+        log::trace!(
+            "Check server selector {}",
+            format!("{}{}/state", self.path, self.server_uuid.unwrap())
+        );
+        let selector = format!("{}{}/state", self.path, self.server_uuid.unwrap());
+        let mut replies = self
+            .z
+            .get(&selector)
+            .target(QueryTarget {
+                kind: queryable::EVAL,
+                target: Target::All,
+            })
+            .await?;
 
-        let ds = self.z.get(&selector).await?;
-        let mut idata: Vec<Reply> = ds.collect().await;
+        let reply = replies.next().await;
+        log::trace!("Response from zenoh is {:?}", reply);
 
-        if idata.is_empty() {
-            return Ok(false);
-        }
-
-        let reply = idata.remove(0);
-        let sample = reply.sample;
-        match sample.value.encoding {
-            Encoding::APP_OCTET_STREAM => {
-                let raw_data = sample.value.payload.contiguous().to_vec();
-                log::trace!("Size of state is {}", raw_data.len());
-                let cs = serialize::deserialize_state::<super::ComponentState>(&raw_data)?;
-                let selector = format!("/@/router/{}", String::from(&cs.routerid));
-                let ds = self.z.get(&selector).await?;
-
-                let mut rdata: Vec<Reply> = ds.collect().await;
-
-                if rdata.len() != 1 {
-                    return Err(ZRPCError::NotFound);
-                }
-
-                let rreply = rdata.remove(0);
-                let rsample = rreply.sample;
-                match rsample.value.encoding {
-                    Encoding::APP_JSON => {
-                        log::trace!(
-                            "Size of Zenoh router state is {}",
-                            rsample.value.payload.len()
-                        );
-                        let sv = String::from_utf8(rsample.value.payload.contiguous().to_vec())?;
-                        let ri = serde_json::from_str::<super::types::ZRouterInfo>(&sv)?;
-                        let mut it = ri.sessions.iter();
-                        let f = it.find(|&x| x.peer == String::from(&cs.peerid).to_uppercase());
-
-                        if f.is_none() {
-                            return Ok(false);
-                        }
-
-                        match cs.status {
-                            super::ComponentStatus::SERVING => Ok(true),
-                            _ => Ok(false),
-                        }
+        if let Some(reply) = reply {
+            let sample = reply.sample;
+            match sample.value.encoding {
+                Encoding::APP_OCTET_STREAM => {
+                    let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
+                        &sample.value.payload.contiguous().to_vec(),
+                    )?;
+                    if ca.status == crate::types::ComponentStatus::SERVING {
+                        return Ok(true);
                     }
-                    _ => Err(ZRPCError::ZenohError(
-                        "Router information is not encoded in JSON".to_string(),
-                    )),
+                }
+                _ => {
+                    return Err(ZRPCError::ZenohError(
+                        "Server information is not correctly encoded".to_string(),
+                    ))
                 }
             }
-            _ => Err(ZRPCError::ZenohError(
-                "Component state is expected to be RAW in Zenoh!!".to_string(),
-            )),
         }
+        Ok(false)
     }
 }
