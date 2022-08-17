@@ -59,7 +59,7 @@ async fn main() {
     };
     let zenoh = zenoh::open(config).await.unwrap();
 
-    let selector = format!("/test/{}", args.size);
+    let selector = format!("test/{}", args.size);
 
     let kind = if args.mode == "peer" {
         "PR-GET"
@@ -67,7 +67,7 @@ async fn main() {
         "CR-GET"
     };
 
-    let path = format!("/test/{}", args.size);
+    let path = format!("test/{}", args.size);
     let data = vec![0; args.size as usize];
     let value = Value::new(data.into());
     zenoh.put(&path, value).await.unwrap();

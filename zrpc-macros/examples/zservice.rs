@@ -25,11 +25,12 @@ use std::time::Duration;
 use uuid::Uuid;
 
 //importing the macros
+use zenoh::prelude::r#async::*;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZServe;
-use zrpc_macros::{znserver, znservice};
+use zrpc_macros::{zserver, zservice};
 
-#[znservice(timeout_s = 60, prefix = "/lfos")]
+#[zservice(timeout_s = 60, prefix = "zrpc-tests")]
 pub trait Hello {
     async fn hello(&self, name: String) -> String;
     async fn add(&mut self) -> u64;
@@ -41,7 +42,7 @@ struct HelloZService {
     pub counter: Arc<Mutex<u64>>,
 }
 
-#[znserver]
+#[zserver]
 impl Hello for HelloZService {
     async fn hello(&self, name: String) -> String {
         format!("Hello {}!, you are connected to {}", name, self.ser_name)
@@ -61,7 +62,7 @@ async fn main() {
     config
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
-    let zsession = Arc::new(zenoh::open(config).await.unwrap());
+    let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
     let service = HelloZService {
         ser_name: "test service".to_string(),

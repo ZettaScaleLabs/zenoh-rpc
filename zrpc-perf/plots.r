@@ -68,7 +68,7 @@ data <- raw_data %>% group_by(SIZE,KIND) %>% summarise( MEAN_MSGS = mean(MSGS),
                                             )
 
 
-data <- data %>% filter(KIND!="ZNRPC-RESP-SER" & KIND!="ZNRPC-RESP-DE")
+data <- data %>% filter(KIND!="ZRPC-RESP-SER" & KIND!="ZRPC-RESP-DE")
 
 # p_msgs <- ggplot(data=data, aes(x=factor(SIZE), y=MEAN_MSGS, fill=KIND)) +
 #   geom_bar(stat="identity", position="dodge") + scale_y_log10()
@@ -137,7 +137,7 @@ plot(p_rtt)
 #   xlab("RTT µS") + ylab("Probability")
 # plot(p_rtt_dist)
 #
-# cmp_data <- data %>% filter(KIND=="PP-ZNRPC" |  KIND=="PP-QUERY-EVAL" | KIND=="GRPC-CLIENT" )
+# cmp_data <- data %>% filter(KIND=="PP-ZRPC" |  KIND=="PP-QUERY-EVAL" | KIND=="GRPC-CLIENT" )
 # p_msgs_cmp<-ggplot(data=cmp_data, aes(x=factor(SIZE), y=MEAN_MSGS, colour=KIND, group=KIND)) +
 #   geom_point(size=2) +
 #   geom_line() +

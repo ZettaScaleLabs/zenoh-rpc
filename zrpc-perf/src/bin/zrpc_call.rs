@@ -21,13 +21,13 @@ use async_std::task;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 
 use std::str;
 use uuid::Uuid;
-use zrpc_macros::{znserver, znservice};
+use zrpc_macros::{zserver, zservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZNServe;
+use zrpc::ZServe;
 
 static DEFAULT_MODE: &str = "client";
 static DEFAULT_ZMODE: &str = "peer";
@@ -53,9 +53,9 @@ struct CallArgs {
     duration: u64,
 }
 
-#[znservice(
+#[zservice(
     timeout_s = 60,
-    prefix = "/test",
+    prefix = "test",
     service_uuid = "00000000-0000-0000-0000-000000000001"
 )]
 pub trait Bench {
@@ -67,7 +67,7 @@ struct BenchZService {
     pub data: Vec<u8>,
 }
 
-#[znserver]
+#[zserver]
 impl Bench for BenchZService {
     async fn bench(&self) -> Vec<u8> {
         self.data.clone()
@@ -100,17 +100,11 @@ async fn client(args: CallArgs) {
         .unwrap();
 
     if args.zenoh_mode == "client" {
-        let peers: Vec<Locator> = vec![args.router.parse().unwrap()];
-        config.set_peers(peers).unwrap();
+        config.connect.endpoints.extend(vec![args.router.parse().unwrap()]);
     }
-    let zenoh = Arc::new(zenoh::open(config).await.unwrap());
+    let zenoh = Arc::new(zenoh::open(config).res().await.unwrap());
 
     task::sleep(std::time::Duration::from_secs(1)).await;
-
-    let info: Properties = zenoh.info().await.into();
-    for (key, value) in info.iter() {
-        log::trace!("{} : {}", key, value);
-    }
 
     let local_servers = BenchClient::find_servers(zenoh.clone()).await.unwrap();
     log::trace!("Servers: {:?}", local_servers);
@@ -118,9 +112,9 @@ async fn client(args: CallArgs) {
     let client = BenchClient::new(zenoh.clone(), local_servers[0]);
 
     let kind = if args.zenoh_mode == "client" {
-        "CRC-ZNRPC"
+        "CRC-ZRPC"
     } else {
-        "PP-ZNRPC"
+        "PP-ZRPC"
     };
 
     let c = count.clone();
@@ -159,11 +153,10 @@ async fn server(args: CallArgs) {
         .unwrap();
 
     if args.zenoh_mode == "client" {
-        let peers: Vec<Locator> = vec![args.router.parse().unwrap()];
-        config.set_peers(peers).unwrap();
+        config.connect.endpoints.extend(vec![args.router.parse().unwrap()]);
     }
 
-    let zenoh = Arc::new(zenoh::open(config).await.unwrap());
+    let zenoh = Arc::new(zenoh::open(config).res().await.unwrap());
 
     let data = vec![0; args.size as usize];
 
@@ -177,5 +170,5 @@ async fn server(args: CallArgs) {
     server.register().await.unwrap();
     let (_s, handle) = server.start().await.unwrap();
 
-    handle.await.unwrap();
+    let _ = handle.await;
 }

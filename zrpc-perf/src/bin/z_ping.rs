@@ -18,8 +18,7 @@ use async_std::task;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use zenoh::buf::WBuf;
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -60,12 +59,11 @@ async fn main() {
 
     match args.peer {
         Some(peer) => {
-            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
-            config.set_peers(peers).unwrap();
+            config.connect.endpoints.extend(vec![peer.parse().unwrap()]);
         }
         None => (),
     };
-    let session = Arc::new(zenoh::open(config).await.unwrap());
+    let session = Arc::new(zenoh::open(config).res().await.unwrap());
 
     let (s, r) = unbounded::<PingInfo>();
 
@@ -78,14 +76,14 @@ async fn main() {
     let c_session = session.clone();
     task::spawn(async move {
         // The resource to wait the response back
-        let reskey_pong = String::from("/test/pong");
+        let reskey_pong = String::from("test/pong");
 
-        let mut sub = c_session.subscribe(&reskey_pong).await.unwrap();
+        let sub = c_session.declare_subscriber(&reskey_pong).res().await.unwrap();
 
         // Wait for the both publishers and subscribers to be declared
         c_barrier.wait().await;
         println!("SQ_NUMBER,SIZE,RTT_US,SCENARIO");
-        while let Some(mut sample) = sub.receiver().next().await {
+        while let Ok(mut sample) = sub.recv_async().await {
             let mut count_bytes = [0u8; 8];
             sample.value.payload.read_bytes(&mut count_bytes);
             let count = u64::from_le_bytes(count_bytes);
@@ -117,7 +115,7 @@ async fn main() {
     });
 
     // The resource to publish data on
-    let reskey_ping = String::from("/test/ping");
+    let reskey_ping = String::from("test/ping");
 
     // Wait for the both publishers and subscribers to be declared
     barrier.wait().await;

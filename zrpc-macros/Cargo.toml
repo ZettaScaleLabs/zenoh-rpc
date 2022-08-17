@@ -14,7 +14,7 @@
 
 [package]
 name = "zrpc-macros"
-version = "0.4.0-alpha1"
+version = "0.5.0-alpha1"
 repository = "https://github.com/eclipse-fog05/fog05"
 homepage = "http://fog05.io"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
@@ -26,9 +26,9 @@ description = "fog05: The End-to-End Compute, Storage and Networking Virtualisat
 # To build with debug on macros: RUSTFLAGS="-Z macro-backtrace"
 
 [dependencies]
-async-std = { version = "=1.11.0", features = ["attributes"] }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master", default-features = false}
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
+async-std = { version = "=1.12.0", features = ["attributes"] }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "api-changes", default-features = false}
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "api-changes" }
 futures = "0.3.5"
 syn-serde = { version = "0.2", features = ["json"] }
 syn = { version = "1.0.11", features = ["full"] }
@@ -36,13 +36,13 @@ quote = "1.0.2"
 proc-macro2 = "1.0.6"
 serde_derive = "1.0.55"
 serde = { version = "1.0.55", features = ["derive"] }
-uhlc = "0.4"
+uhlc = "0.5"
 zrpc = {path = "../zrpc"}
 base64 = "0.13.0"
-log = "0.4.11"
-uuid = { version = "0.8.1", features = ["serde", "v4"] }
-darling = "0.13"
-Inflector = "0.11.4"
+log = "0.4"
+uuid = { version = "1.1", features = ["serde", "v4"] }
+darling = "0.14"
+Inflector = "0.11"
 
 
 
@@ -53,11 +53,3 @@ env_logger = "0.9.0"
 
 [lib]
 proc-macro = true
-
-
-[[example]]
-name = "znservice"
-
-
-[[example]]
-name = "expanded"

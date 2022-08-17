@@ -20,11 +20,13 @@ use std::str;
 use uuid::Uuid;
 
 //importing the macros
+use zenoh::prelude::r#async::*;
+use zenoh::prelude::*;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZServe;
-use zrpc_macros::{znserver, znservice};
+use zrpc_macros::{zserver, zservice};
 
-#[znservice(timeout_s = 60, prefix = "/lfos")]
+#[zservice(timeout_s = 60, prefix = "zrpc-tests")]
 pub trait Hello {
     async fn hello(&self, name: String) -> String;
     async fn add(&mut self) -> u64;
@@ -36,7 +38,7 @@ struct HelloZService {
     pub counter: Arc<Mutex<u64>>,
 }
 
-#[znserver]
+#[zserver]
 impl Hello for HelloZService {
     async fn hello(&self, name: String) -> String {
         format!("Hello {}!, you are connected to {}", name, self.ser_name)
@@ -56,7 +58,7 @@ fn service_discovery() {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
         let service = HelloZService {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
@@ -88,7 +90,7 @@ fn service_call() {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
         let service = HelloZService {
             ser_name: "test service".to_string(),
@@ -136,7 +138,7 @@ fn service_unavailable() {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
         let servers = HelloClient::find_servers(zsession).await.unwrap();
         let empty: Vec<Uuid> = vec![];

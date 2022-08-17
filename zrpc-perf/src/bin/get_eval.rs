@@ -65,7 +65,7 @@ async fn main() {
 
     let zenoh = zenoh::open(config).await.unwrap();
 
-    let path = String::from("/test/eval");
+    let path = String::from("test/eval");
 
     let c = count.clone();
     let s = args.size;
