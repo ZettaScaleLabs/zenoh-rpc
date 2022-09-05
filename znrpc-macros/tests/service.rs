@@ -1,5 +1,5 @@
 /*********************************************************************************
-* Copyright (c) 2022 ZettaScale Technology
+* Copyright (c) 2018,2020 ADLINK Technology Inc.
 *
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
@@ -8,7 +8,7 @@
 *
 * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 * Contributors:
-*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+*   ADLINK fog05 team, <fog05@adlink-labs.tech>
 *********************************************************************************/
 
 #![allow(clippy::manual_async_fn)]
@@ -20,9 +20,9 @@ use std::str;
 use uuid::Uuid;
 
 //importing the macros
+use znrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZServe;
-use zrpc_macros::{znserver, znservice};
+use zrpc::ZNServe;
 
 #[znservice(timeout_s = 60, prefix = "/lfos")]
 pub trait Hello {
@@ -77,7 +77,7 @@ fn service_discovery() {
         server.unregister().await.unwrap();
         server.disconnect(stopper).await.unwrap();
 
-        let _ = handle.await;
+        handle.await.unwrap();
     });
 }
 
@@ -125,7 +125,7 @@ fn service_call() {
         server.unregister().await.unwrap();
         server.disconnect(stopper).await.unwrap();
 
-        let _ = handle.await;
+        handle.await.unwrap();
     });
 }
 

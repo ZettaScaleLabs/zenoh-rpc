@@ -1,20 +1,6 @@
-#
-# Copyright (c) 2022 ZettaScale Technology
-#
-# This program and the accompanying materials are made available under the
-# terms of the Eclipse Public License 2.0 which is available at
-# http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
-# which is available at https://www.apache.org/licenses/LICENSE-2.0.
-#
-# SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
-#
-# Contributors:
-#   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
-#
-
 [package]
-name = "zrpc-macros"
-version = "0.4.0-alpha1"
+name = "znrpc-macros"
+version = "0.3.0-alpha1"
 repository = "https://github.com/eclipse-fog05/fog05"
 homepage = "http://fog05.io"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
@@ -27,7 +13,7 @@ description = "fog05: The End-to-End Compute, Storage and Networking Virtualisat
 
 [dependencies]
 async-std = { version = "=1.11.0", features = ["attributes"] }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master", default-features = false}
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master"}
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
 futures = "0.3.5"
 syn-serde = { version = "0.2", features = ["json"] }

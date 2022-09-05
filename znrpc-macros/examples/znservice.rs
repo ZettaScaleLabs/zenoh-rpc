@@ -1,16 +1,3 @@
-/*********************************************************************************
-* Copyright (c) 2022 ZettaScale Technology
-*
-* This program and the accompanying materials are made available under the
-* terms of the Eclipse Public License 2.0 which is available at
-* http://www.eclipse.org/legal/epl-2.0, or the Apache Software License 2.0
-* which is available at https://www.apache.org/licenses/LICENSE-2.0.
-*
-* SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
-* Contributors:
-*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
-*********************************************************************************/
-
 #![allow(clippy::manual_async_fn)]
 #![allow(clippy::large_enum_variant)]
 
@@ -25,9 +12,9 @@ use std::time::Duration;
 use uuid::Uuid;
 
 //importing the macros
+use znrpc_macros::{znserver, znservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZServe;
-use zrpc_macros::{znserver, znservice};
+use zrpc::ZNServe;
 
 #[znservice(timeout_s = 60, prefix = "/lfos")]
 pub trait Hello {
@@ -122,7 +109,7 @@ async fn main() {
     server.unregister().await.unwrap();
     server.disconnect(stopper).await.unwrap();
 
-    let _ = handle.await;
+    handle.await.unwrap();
 
     // this should return an error as the server is not there
     // let hello = client.hello("client".to_string()).await;
