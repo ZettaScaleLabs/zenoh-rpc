@@ -23,8 +23,8 @@ edition = "2018"
 [dependencies]
 async-std = { version = "=1.11.0", features = ["attributes"] }
 futures = "0.3.5"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master", default-features = false}
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", rev = "45b7ad70bddf45dfcdcae80e9c9a7680c70ac289", default-features = false}
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", rev = "45b7ad70bddf45dfcdcae80e9c9a7680c70ac289" }
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 base64 = "0.13.0"
 serde_derive = "1.0.55"
