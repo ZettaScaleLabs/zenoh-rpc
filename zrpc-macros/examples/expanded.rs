@@ -301,7 +301,7 @@ where
 
                 log::debug!("Received query {:?}", query);
                 let selector = query.selector();
-                let parsed_selector = selector.value_selector_cowmap()?;
+                let parsed_selector = selector.parameters_cowmap()?;
                 let base64_req = parsed_selector.get("req").ok_or(ZRPCError::MissingValue)?;
                 let b64_bytes = base64::decode(base64_req.as_bytes())?;
                 let req = zrpc::serialize::deserialize_request::<HelloRequest>(&b64_bytes)?;
@@ -384,7 +384,8 @@ where
                 zrpc::ComponentStatus::SERVING => {
                     ci.status = zrpc::ComponentStatus::REGISTERED;
                     drop(ci);
-                    Ok(_stop.abort())
+                    _stop.abort();
+                    Ok(())
                 }
                 _ => Err(ZRPCError::StateTransitionNotAllowed(
                     "Cannot stop a component in a state different than WORK".to_string(),
@@ -429,7 +430,8 @@ where
                 zrpc::ComponentStatus::HALTED => {
                     ci.status = zrpc::ComponentStatus::HALTED;
                     drop(ci);
-                    Ok(_stop.abort())
+                    _stop.abort();
+                    Ok(())
                 }
                 _ => Err(ZRPCError::StateTransitionNotAllowed(
                     "Cannot disconnect a component in a state different than HALTED".to_string(),
@@ -481,7 +483,6 @@ impl HelloClient {
     ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static {
         async move {
             use zenoh::prelude::r#async::*;
-            use zenoh::query::*;
 
             let selector =
                 "zservice/Hello/2967c40b-a9a4-4330-b5f6-e0315b2356a9/*/state".to_string();
@@ -493,7 +494,7 @@ impl HelloClient {
                     Ok(sample) => match sample.value.encoding {
                         Encoding::APP_OCTET_STREAM => {
                             let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                                &sample.value.payload.contiguous().to_vec(),
+                                &sample.value.payload.contiguous(),
                             )?;
                             servers.push(ca.uuid);
                         }
@@ -519,7 +520,6 @@ impl HelloClient {
     ) -> impl std::future::Future<Output = ZRPCResult<Vec<zrpc::ComponentState>>> + 'static {
         async move {
             use zenoh::prelude::r#async::*;
-            use zenoh::query::*;
 
             let selector =
                 "zservice/Hello/2967c40b-a9a4-4330-b5f6-e0315b2356a9/*/state".to_string();
@@ -531,7 +531,7 @@ impl HelloClient {
                     Ok(sample) => match sample.value.encoding {
                         Encoding::APP_OCTET_STREAM => {
                             let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                                &sample.value.payload.contiguous().to_vec(),
+                                &sample.value.payload.contiguous(),
                             )?;
                             servers.push(ca);
                         }
@@ -572,7 +572,7 @@ impl HelloClient {
                 Some(head) => head.to_string().to_uppercase(),
                 None => "".to_string(),
             };
-            if rid == "" {
+            if rid.is_empty() {
                 return Ok(vec![]);
             }
 
@@ -587,7 +587,7 @@ impl HelloClient {
                 Ok(sample) => match sample.value.encoding {
                     Encoding::APP_JSON => {
                         let ri = zrpc::serialize::deserialize_router_info(
-                            &sample.value.payload.contiguous().to_vec(),
+                            &sample.value.payload.contiguous(),
                         )?;
                         let r: Vec<Uuid> = servers
                             .into_iter()

@@ -840,7 +840,7 @@ impl<'a> ZServiceGenerator<'a> {
                             let query = queryable.recv_async().await.map_err(|_| zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             log::trace!("Received query {:?}", query);
                             let query_selector = query.selector();
-                            let parsed_selector = query_selector.value_selector_cowmap()?;
+                            let parsed_selector = query_selector.parameters_cowmap()?;
                             let base64_req = parsed_selector.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             let b64_bytes = base64::decode(base64_req.as_bytes())?;
                             let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
@@ -924,7 +924,8 @@ impl<'a> ZServiceGenerator<'a> {
                             zrpc::ComponentStatus::SERVING => {
                                 ci.status = zrpc::ComponentStatus::REGISTERED;
                                 drop(ci);
-                                Ok(_stop.abort())
+                                _stop.abort();
+                                Ok(())
                             },
                             _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot stop a component in a state different than WORK".to_string())),
                         }
@@ -963,7 +964,8 @@ impl<'a> ZServiceGenerator<'a> {
                                 zrpc::ComponentStatus::HALTED => {
                                     ci.status = zrpc::ComponentStatus::HALTED;
                                     drop(ci);
-                                    Ok(_stop.abort())
+                                    _stop.abort();
+                                    Ok(())
                                 },
                                 _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot disconnect a component in a state different than HALTED".to_string())),
                             }
@@ -1081,7 +1083,7 @@ impl<'a> ZServiceGenerator<'a> {
                                 Ok(sample) => match sample.value.encoding {
                                     Encoding::APP_OCTET_STREAM => {
                                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                                            &sample.value.payload.contiguous().to_vec(),
+                                            &sample.value.payload.contiguous(),
                                         )?;
                                         servers.push(ca.uuid);
                                     }
@@ -1122,7 +1124,7 @@ impl<'a> ZServiceGenerator<'a> {
                                 Ok(sample) => match sample.value.encoding {
                                     Encoding::APP_OCTET_STREAM => {
                                         let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
-                                            &sample.value.payload.contiguous().to_vec(),
+                                            &sample.value.payload.contiguous(),
                                         )?;
                                         servers.push(ca);
                                     }
@@ -1187,7 +1189,7 @@ impl<'a> ZServiceGenerator<'a> {
                             Ok(sample) => match sample.value.encoding {
                                 Encoding::APP_JSON => {
                                     let ri = zrpc::serialize::deserialize_router_info(
-                                        &sample.value.payload.contiguous().to_vec(),
+                                        &sample.value.payload.contiguous(),
                                     )?;
                                     let r: Vec<Uuid> = servers
                                         .into_iter()

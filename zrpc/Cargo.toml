@@ -23,8 +23,8 @@ edition = "2018"
 [dependencies]
 async-std = { version = "=1.12.0", features = ["attributes"] }
 futures = "0.3.5"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "api-changes", default-features = false}
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "api-changes" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master", default-features = false}
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
 uuid = { version = "1.1", features = ["serde", "v4"] }
 base64 = "0.13.0"
 serde_derive = "1.0.55"
@@ -49,7 +49,7 @@ transport_tcp = ["zenoh/transport_tcp"]
 transport_tls = ["zenoh/transport_tls"]
 transport_udp = ["zenoh/transport_udp"]
 transport_unixsock-stream = ["zenoh/transport_unixsock-stream"]
-# transport_ws = ["zenoh/transport_ws"]
+transport_ws = ["zenoh/transport_ws"]
 
 
 

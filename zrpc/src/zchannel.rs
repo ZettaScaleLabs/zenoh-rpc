@@ -129,7 +129,7 @@ where
                 Ok(sample) => match sample.value.encoding {
                     Encoding::APP_OCTET_STREAM => {
                         let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
-                            &sample.value.payload.contiguous().to_vec(),
+                            &sample.value.payload.contiguous(),
                         )?;
                         if ca.status == crate::types::ComponentStatus::SERVING {
                             return Ok(true);

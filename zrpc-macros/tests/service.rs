@@ -21,7 +21,6 @@ use uuid::Uuid;
 
 //importing the macros
 use zenoh::prelude::r#async::*;
-use zenoh::prelude::*;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZServe;
 use zrpc_macros::{zserver, zservice};
@@ -80,6 +79,10 @@ fn service_discovery() {
         server.disconnect(stopper).await.unwrap();
 
         let _ = handle.await;
+
+        drop(zsession);
+        // Sleeping to be sure the Zenoh Session is gone
+        async_std::task::sleep(std::time::Duration::from_secs(5)).await;
     });
 }
 
@@ -128,6 +131,9 @@ fn service_call() {
         server.disconnect(stopper).await.unwrap();
 
         let _ = handle.await;
+        drop(zsession);
+        // Sleeping to be sure the Zenoh Session is gone
+        async_std::task::sleep(std::time::Duration::from_secs(5)).await;
     });
 }
 

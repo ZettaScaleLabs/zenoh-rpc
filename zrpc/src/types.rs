@@ -20,7 +20,7 @@ extern crate serde_json;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ComponentStatus {
     HALTED = 0,
     INITIALIZING = 1,
@@ -28,7 +28,7 @@ pub enum ComponentStatus {
     SERVING = 3,
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ComponentState {
     pub uuid: Uuid,
     pub name: String,
