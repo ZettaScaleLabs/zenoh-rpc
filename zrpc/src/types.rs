@@ -1,5 +1,5 @@
 /*********************************************************************************
-* Copyright (c) 2022 ZettaScale Technology
+* Copyright (c) 2018,2020 ADLINK Technology Inc.
 *
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
@@ -8,7 +8,7 @@
 *
 * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 * Contributors:
-*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+*   ADLINK fog05 team, <fog05@adlink-labs.tech>
 *********************************************************************************/
 
 extern crate serde;
@@ -56,4 +56,10 @@ pub struct ZRouterInfo {
     pub sessions: Vec<ZSessionInfo>,
     pub plugins: Vec<ZPluginInfo>,
     pub time: Option<String>,
+}
+
+pub enum RunResultAction {
+    Restart(Option<ZRPCError>),
+    Stop,
+    StopError(ZRPCError),
 }
