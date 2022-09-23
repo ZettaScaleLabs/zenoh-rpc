@@ -54,7 +54,7 @@ state_cbor = ["serde_cbor"]
 
 router_json = ["serde_json"]
 
-default = ["resp_cbor","send_cbor","state_cbor","router_json"]
+default = ["resp_cbor","send_cbor","state_cbor","router_json", "transport_tcp", "transport_udp"]
 
 
 
