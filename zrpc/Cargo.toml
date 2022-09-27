@@ -3,25 +3,24 @@ name = "zrpc"
 version = "0.5.0-alpha1"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 edition = "2018"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-std = { version = "=1.12.0", features = ["attributes"] }
-futures = "0.3.5"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master"}
+base64 = "=0.13.0"
+bincode = { version = "=1.3.3", optional = true }
+flume = { version = "=0.10" }
+futures = "=0.3.24"
+log = "=0.4"
+serde = { version = "=1.0.145", features = ["derive"] }
+serde_cbor = { version = "=0.11", optional = true }
+serde_derive = "=1.0.145"
+serde_json = { version = "=1", optional = true }
+serde_yaml = { version = "=0.9", optional = true }
+thiserror = "=1.0"
+uuid = { version = "=1.1", features = ["serde", "v4"] }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-uuid = { version = "1.1", features = ["serde", "v4"] }
-base64 = "0.13.0"
-serde_derive = "1.0.55"
-serde = { version = "1.0.55", features = ["derive"] }
-thiserror = "1.0"
-log = "0.4"
-bincode = { version = "1.3.1", optional = true}
-serde_yaml = {version = "0.9", optional = true}
-serde_cbor = {version = "0.11", optional = true}
-serde_json = { version = "1", optional = true}
-flume = { version  = "0.10" }
 
 [features]
 #zenoh feature re-exports
@@ -36,8 +35,6 @@ transport_tls = ["zenoh/transport_tls"]
 transport_udp = ["zenoh/transport_udp"]
 transport_unixsock-stream = ["zenoh/transport_unixsock-stream"]
 transport_ws = ["zenoh/transport_ws"]
-
-
 
 resp_bincode = ["bincode"]
 send_bincode = ["bincode"]
@@ -54,7 +51,7 @@ state_cbor = ["serde_cbor"]
 
 router_json = ["serde_json"]
 
-default = ["resp_cbor","send_cbor","state_cbor","router_json", "transport_tcp", "transport_udp"]
+default = ["resp_cbor", "send_cbor", "state_cbor", "router_json", "transport_tcp", "transport_udp"]
 
 
 

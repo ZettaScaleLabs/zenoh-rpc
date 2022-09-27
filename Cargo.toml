@@ -21,9 +21,7 @@ members = [
 exclude = [
   "zrpc-perf",
 ]
-
-#[profile.release]
-#debug=false
+#[profile.release]#debug=false
 #lto="fat"
 #codegen-units=1
 #opt-level=3
@@ -31,7 +29,7 @@ exclude = [
 
 
 [profile.release]
-debug=false
+debug = false
 lto = true
 codegen-units = 1
 opt-level = 3
