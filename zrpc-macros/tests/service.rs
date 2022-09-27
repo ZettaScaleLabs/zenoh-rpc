@@ -15,7 +15,6 @@
 #![allow(clippy::large_enum_variant)]
 
 use async_std::sync::{Arc, Mutex};
-
 use std::str;
 use uuid::Uuid;
 
@@ -50,28 +49,67 @@ impl Hello for HelloZService {
     }
 }
 
+fn configure_zenoh(id: Uuid, listen: String, connect: String) -> zenoh::config::Config {
+    let mut config = zenoh::config::Config::default();
+    config.set_id(id.into()).unwrap();
+    config
+        .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+        .unwrap();
+    config.scouting.multicast.set_enabled(Some(false)).unwrap();
+    config.listen.endpoints.push(listen.parse().unwrap());
+    config.connect.endpoints.push(connect.parse().unwrap());
+
+    config
+}
+
+async fn wait_for_peer(session: &zenoh::Session, id: Uuid) {
+    let id = ZenohId::from(id);
+    while !session.info().peers_zid().res().await.any(|e| e == id) {
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await
+    }
+}
+
 #[test]
 fn service_discovery() {
     async_std::task::block_on(async {
-        let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
+        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
+        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
+
+        let server_config = configure_zenoh(
+            server_zid,
+            "tcp/127.0.0.1:9000".to_string(),
+            "tcp/127.0.0.1:9001".to_string(),
+        );
+
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9001".to_string(),
+            "tcp/127.0.0.1:9000".to_string(),
+        );
+
+        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+
+        // Check zenoh sessions are connected
+        wait_for_peer(&server_session, client_zid).await;
+        wait_for_peer(&client_session, server_zid).await;
+
         let service = HelloZService {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
         };
-        let z = zsession.clone();
 
-        let server = service.get_hello_server(z, None);
+        let server = service.get_hello_server(server_session, None);
         let ser_uuid = server.instance_uuid();
         let (stopper, _h) = server.connect().await.unwrap();
         server.initialize().await.unwrap();
         server.register().await.unwrap();
         let (s, handle) = server.start().await.unwrap();
 
-        let mut servers = HelloClient::find_servers(zsession.clone()).await.unwrap();
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+
+        let mut servers = HelloClient::find_servers(client_session).await.unwrap();
         assert_eq!(ser_uuid, servers.remove(0));
 
         server.stop(s).await.unwrap();
@@ -79,36 +117,50 @@ fn service_discovery() {
         server.disconnect(stopper).await.unwrap();
 
         let _ = handle.await;
-
-        drop(zsession);
-        // Sleeping to be sure the Zenoh Session is gone
-        async_std::task::sleep(std::time::Duration::from_secs(5)).await;
     });
 }
 
 #[test]
 fn service_call() {
     async_std::task::block_on(async {
-        let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
+        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000003").unwrap();
+        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000004").unwrap();
+
+        let server_config = configure_zenoh(
+            server_zid,
+            "tcp/127.0.0.1:9002".to_string(),
+            "tcp/127.0.0.1:9003".to_string(),
+        );
+
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9003".to_string(),
+            "tcp/127.0.0.1:9002".to_string(),
+        );
+
+        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+
+        // Check zenoh sessions are connected
+        wait_for_peer(&server_session, client_zid).await;
+        wait_for_peer(&client_session, server_zid).await;
 
         let service = HelloZService {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
         };
-        let z = zsession.clone();
 
-        let server = service.get_hello_server(z, None);
+        let server = service.get_hello_server(server_session, None);
         let ser_uuid = server.instance_uuid();
         let (stopper, _h) = server.connect().await.unwrap();
         server.initialize().await.unwrap();
         server.register().await.unwrap();
         let (s, handle) = server.start().await.unwrap();
 
-        let client = HelloClient::new(zsession.clone(), ser_uuid);
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+
+        let client = HelloClient::new(client_session, ser_uuid);
 
         let hello = client.hello("client".to_string()).await.unwrap();
 
@@ -131,22 +183,38 @@ fn service_call() {
         server.disconnect(stopper).await.unwrap();
 
         let _ = handle.await;
-        drop(zsession);
-        // Sleeping to be sure the Zenoh Session is gone
-        async_std::task::sleep(std::time::Duration::from_secs(5)).await;
     });
 }
 
 #[test]
 fn service_unavailable() {
     async_std::task::block_on(async {
-        let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
+        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000005").unwrap();
+        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000006").unwrap();
 
-        let servers = HelloClient::find_servers(zsession).await.unwrap();
+        let server_config = configure_zenoh(
+            server_zid,
+            "tcp/127.0.0.1:9004".to_string(),
+            "tcp/127.0.0.1:9005".to_string(),
+        );
+
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9005".to_string(),
+            "tcp/127.0.0.1:9004".to_string(),
+        );
+
+        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+
+        // Check zenoh sessions are connected
+        wait_for_peer(&server_session, client_zid).await;
+        wait_for_peer(&client_session, server_zid).await;
+
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+
+        let servers = HelloClient::find_servers(client_session).await.unwrap();
         let empty: Vec<Uuid> = vec![];
         assert_eq!(empty, servers);
     });
