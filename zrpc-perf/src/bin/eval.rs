@@ -33,7 +33,7 @@ async fn main() {
 
     let zenoh = zenoh::open(config).await.unwrap();
 
-    let path = String::from("/test/eval");
+    let path = String::from("test/eval");
 
     let data: Vec<u8> = vec![0; args.size as usize];
     let mut query_stream = zenoh.queryable(&path).kind(EVAL).await.unwrap();

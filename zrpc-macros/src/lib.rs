@@ -1,5 +1,5 @@
 /*********************************************************************************
-* Copyright (c) 2018,2020 ADLINK Technology Inc.
+* Copyright (c) 2022 ZettaScale Technology
 *
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
@@ -8,7 +8,7 @@
 *
 * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 * Contributors:
-*   ADLINK fog05 team, <fog05@adlink-labs.tech>
+*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 #![allow(clippy::upper_case_acronyms)]
 #![recursion_limit = "512"]
@@ -54,7 +54,7 @@ macro_rules! extend_errors {
 }
 
 #[derive(Debug, FromMeta)]
-struct ZNServiceMacroArgs {
+struct ZServiceMacroArgs {
     timeout_s: u16,
     #[darling(default)]
     prefix: Option<String>,
@@ -62,14 +62,14 @@ struct ZNServiceMacroArgs {
     service_uuid: Option<String>,
 }
 
-struct ZNService {
+struct ZService {
     attrs: Vec<Attribute>,
     vis: Visibility,
     ident: Ident,
     evals: Vec<EvalMethod>,
 }
 
-impl Parse for ZNService {
+impl Parse for ZService {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
         let vis = input.parse()?;
@@ -199,20 +199,20 @@ pub fn derive_ast(item: TokenStream) -> TokenStream {
 /// - new_stub client factory fn
 /// - Request and Response enums
 #[proc_macro_attribute]
-pub fn znservice(attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn zservice(attr: TokenStream, input: TokenStream) -> TokenStream {
     let unit_type: &Type = &parse_quote!(());
 
     //parsing the trait body
-    let ZNService {
+    let ZService {
         ref attrs,
         ref vis,
         ref ident,
         ref evals,
-    } = parse_macro_input!(input as ZNService);
+    } = parse_macro_input!(input as ZService);
 
     //parsing the attributes to the macro
     let attr_args = parse_macro_input!(attr as AttributeArgs);
-    let macro_args = match ZNServiceMacroArgs::from_list(&attr_args) {
+    let macro_args = match ZServiceMacroArgs::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => {
             return TokenStream::from(e.write_errors());
@@ -237,13 +237,13 @@ pub fn znservice(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     //service eval path
     let path = match macro_args.prefix {
-        Some(prefix) => format!("{}/znservice/{}/{}/", prefix, ident, service_uuid),
-        None => format!("/znservice/{}/{}/", ident, service_uuid),
+        Some(prefix) => format!("{}/zservice/{}/{}/", prefix, ident, service_uuid),
+        None => format!("zservice/{}/{}/", ident, service_uuid),
     };
 
     let service_name = format!("{}Service", ident);
     // Generates the code
-    let ts: TokenStream = ZNServiceGenerator {
+    let ts: TokenStream = ZServiceGenerator {
         service_ident: ident,
         server_ident: &format_ident!("Serve{}", ident), //Server is called Serve<Trait Name>
         client_ident: &format_ident!("{}Client", ident), //Client is called <Trait Name>Client
@@ -286,7 +286,7 @@ pub fn znservice(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// Modifies the method in a similar way to what async_trait does
 /// This impl:
 ///
-/// #[znserver]
+/// #[zserver]
 /// impl Hello for Server {
 ///     async pub fn hello(&self, param : String) -> String {
 ///         format!("Hello {} from {}", param, self)
@@ -304,7 +304,7 @@ pub fn znservice(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///     }
 /// }
 #[proc_macro_attribute]
-pub fn znserver(_attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn zserver(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let mut item = syn::parse_macro_input!(input as ItemImpl);
     let span = item.span();
 
@@ -322,7 +322,6 @@ pub fn znserver(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     // put the body inside an task::block_on(async {})
                     /*
                     let content = method.block.to_token_stream();
-
                     let updated_impl = TokenStream::from(quote! {
                         {
                             task::block_on(
@@ -474,7 +473,7 @@ fn verify_types_were_provided(
             e.extend(syn::Error::new(
                 fn_span.join(method.sig.ident.span()).unwrap_or(fn_span),
                 format!(
-                    "hint: `#[znerver]` only rewrites async fns, and `fn {}` is not async",
+                    "hint: `#[zerver]` only rewrites async fns, and `fn {}` is not async",
                     method.sig.ident
                 ),
             ));
@@ -487,8 +486,8 @@ fn verify_types_were_provided(
     result
 }
 
-/// Generator for the ZNService
-struct ZNServiceGenerator<'a> {
+/// Generator for the ZService
+struct ZServiceGenerator<'a> {
     service_ident: &'a Ident,            //service type
     server_ident: &'a Ident,             //server type
     client_ident: &'a Ident,             //client type
@@ -509,7 +508,7 @@ struct ZNServiceGenerator<'a> {
     service_get_server_ident: &'a Ident, //the ident for the get_<trait>_server
 }
 
-impl<'a> ZNServiceGenerator<'a> {
+impl<'a> ZServiceGenerator<'a> {
     // crates the service trait
     fn trait_service(&self) -> TokenStream2 {
         let &Self {
@@ -619,7 +618,7 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
 
 
-            impl<S> zrpc::ZNServe<#request_ident> for #server_ident<S>
+            impl<S> zrpc::ZServe<#request_ident> for #server_ident<S>
             where S: #service_ident + Send +'static
             {
                 type Resp = #response_ident;
@@ -630,64 +629,83 @@ impl<'a> ZNServiceGenerator<'a> {
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn connect(&'_ self) ->
-                ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<(async_std::channel::Sender<()>, async_std::task::JoinHandle<ZRPCResult<()>>)>> + '_>> {
+                ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<(
+                    zrpc::AbortHandle,
+                    async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
+                )>> + '_>> {
                     log::trace!("Connect Service {} Instance {}", #service_name, self.instance_uuid());
 
-                    async fn __connect<S>(_self: &#server_ident<S>) -> ZRPCResult<(async_std::channel::Sender<()>, async_std::task::JoinHandle<ZRPCResult<()>>)>
+                    async fn __connect<S>(_self: &#server_ident<S>) -> ZRPCResult<(
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
+                    )>
                     where
                         S: #service_ident + Send + 'static,
                     {
                         use futures::prelude::*;
-                        use async_std::prelude::FutureExt;
+                        use std::convert::TryInto;
+                        use zenoh::prelude::r#async::*;
+                        use zenoh::prelude::*;
 
 
-                        let zinfo = _self.z.info().await;
-                        let pid = zinfo.get(&zenoh::info::ZN_INFO_PID_KEY).ok_or(ZRPCError::MissingValue)?.to_uppercase();
-                        let rid = match zinfo.get(&zenoh::info::ZN_INFO_ROUTER_PID_KEY) {
-                            Some(r_info) => {
-                                if !r_info.is_empty() {
-                                    r_info.split(',').collect::<Vec<_>>()[0].to_uppercase()
-                                } else {
-                                    "".to_string()
-                                }
+                        let zinfo = _self.z.info();
+                        let pid = zinfo.zid().res().await.to_string().to_uppercase();
 
-                            },
+                        let rid = match zinfo
+                            .routers_zid()
+                            .res()
+                            .await
+                            .collect::<Vec<ZenohId>>()
+                            .first()
+                        {
+                            Some(head) => head.to_string().to_uppercase(),
                             None => "".to_string(),
                         };
+
                         let mut ci = _self.state.write().await;
                         ci.peerid = pid.clone().to_uppercase();
                         drop(ci);
-                        let (s,r) = async_std::channel::bounded::<()>(1);
 
                         let zsession = async_std::sync::Arc::clone(&_self.z);
 
                         let state = _self.state.clone();
                         let path = format!("{}{}/state",#eval_path,_self.instance_uuid());
 
-                        log::trace!("Spawning state responder task");
-                        let h = async_std::task::spawn(
-                            async move {
-                                log::trace!("Registering queryable on {:?}", path);
-                                let mut queryable = zsession.queryable(&path).kind(zenoh::queryable::EVAL).await?;
-                                log::trace!("Queryable registered on {:?}", path);
-                                let rcv_loop = async {
-                                    loop{
-                                        let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                                        let ci = state.read().await;
-                                        let data = zrpc::serialize::serialize_state(&*ci)?;
-                                        drop(ci);
+                        let run_loop = async move {
+                            let mut queryable = zsession
+                                .declare_queryable(&path)
+                                .res()
+                                .await?;
 
-                                        let value = zenoh::prelude::Value::new(data.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                                        let sample  = zenoh::prelude::Sample::new(path.to_string(), value);
-                                        log::trace!("Reply to state queryable!");
-                                        query.reply(sample);
-                                    }
-                                };
-                                log::trace!("Receiver loop started");
-                                rcv_loop.race(r.recv().map_err(|e| ZRPCError::Error(e.to_string()))).await
+                            let kexpr: KeyExpr = (path.clone().try_into())
+                                .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e)))?;
+
+
+                            loop {
+                                let query = queryable
+                                    .recv_async()
+                                    .await
+                                    .map_err(|_| zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                                let ci = state.read().await;
+                                let data = zrpc::serialize::serialize_state(&*ci)?;
+                                drop(ci);
+                                let value = Value::new(data.into())
+                                    .encoding(Encoding::APP_OCTET_STREAM);
+                                let sample = Sample::new(kexpr.clone(), value);
+                                query.reply(Ok(sample)).res().await.map_err(|e| {
+                                    zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e))
+                                })?;
                             }
-                        );
-                        Ok((s,h))
+                        };
+
+
+                        let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
+
+                        log::trace!("Spawning state responder task");
+                        let task_handle =
+                            async_std::task::spawn(zrpc::Abortable::new(run_loop, abort_registration));
+
+                        Ok((abort_handle, task_handle))
                     }
                     Box::pin(__connect(self))
                 }
@@ -740,8 +758,8 @@ impl<'a> ZNServiceGenerator<'a> {
                     Box<
                         dyn std::future::Future<
                                 Output = ZRPCResult<(
-                                    async_std::channel::Sender<()>,
-                                    async_std::task::JoinHandle<ZRPCResult<()>>
+                                    zrpc::AbortHandle,
+                                    async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                                 )>> + '_>>
                     {
 
@@ -750,8 +768,8 @@ impl<'a> ZNServiceGenerator<'a> {
                     async fn __start<S>(
                         _self: &#server_ident<S>,
                     ) -> ZRPCResult<(
-                        async_std::channel::Sender<()>,
-                        async_std::task::JoinHandle<ZRPCResult<()>>,
+                        zrpc::AbortHandle,
+                        async_std::task::JoinHandle<Result<ZRPCResult<()>, zrpc::Aborted>>,
                     )>
                     where
                         S: #service_ident + Send + 'static,
@@ -766,12 +784,16 @@ impl<'a> ZNServiceGenerator<'a> {
 
                                     let server = _self.clone();
                                     let b =  barrier.clone();
+                                    let (abort_handle, abort_registration) = zrpc::AbortHandle::new_pair();
 
-                                    let h = async_std::task::spawn_blocking( move || {
-                                        async_std::task::block_on(async {
-                                            server.serve(r, b).await
-                                        })
+                                    log::trace!("Spawning serving loop");
+                                    let task_handle = async_std::task::spawn_blocking(move || {
+                                        async_std::task::block_on(zrpc::Abortable::new(
+                                            async { server.serve(b).await },
+                                            abort_registration,
+                                        ))
                                     });
+
                                     log::trace!("Waiting for serving loop to be ready");
                                     barrier.wait().await;
 
@@ -780,7 +802,7 @@ impl<'a> ZNServiceGenerator<'a> {
                                     ci.status = zrpc::ComponentStatus::SERVING;
                                     drop(ci);
 
-                                    Ok((s,h))
+                                    Ok((abort_handle, task_handle))
 
                                 }
                                 _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot start a component in a state different than REGISTERED".to_string())),
@@ -797,23 +819,29 @@ impl<'a> ZNServiceGenerator<'a> {
                     where
                         S: #service_ident + Send + 'static,
                     {
-                        use futures::prelude::*;
+                        use std::convert::TryInto;
+                        use zenoh::prelude::r#async::*;
+                        use zenoh::prelude::*;
+
                         let path = format!("{}{}/eval",#eval_path, _self.instance_uuid());
                         log::trace!("Registering eval on {:?}", path);
                         let mut queryable = _self
                             .z
-                            .queryable(&path)
-                            .kind(zenoh::queryable::EVAL)
+                            .declare_queryable(&path)
+                            .res()
                             .await?;
+
+                        let kexpr: KeyExpr = (path.clone().try_into())
+                            .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e)))?;
 
                         log::trace!("Registered on {:?}", path);
                         loop {
-                            let query = queryable.receiver().next().await.ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                            let query = queryable.recv_async().await.map_err(|_| zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             log::trace!("Received query {:?}", query);
                             let query_selector = query.selector();
-                            let parsed_selector = query_selector.parse_value_selector()?;
-                            let base64_req = parsed_selector.properties.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                            let b64_bytes = base64::decode(base64_req)?;
+                            let parsed_selector = query_selector.parameters_cowmap()?;
+                            let base64_req = parsed_selector.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
+                            let b64_bytes = base64::decode(base64_req.as_bytes())?;
                             let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
                             log::trace!("Received on {:?} {:?}", path, req);
 
@@ -828,9 +856,13 @@ impl<'a> ZNServiceGenerator<'a> {
                                     }
                                 )*
                             }?;
-                            let value = zenoh::prelude::Value::new(encoded_resp.into()).encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
-                            let sample = zenoh::prelude::Sample::new(path.to_string(), value);
-                            query.reply_async(sample).await;
+                            let value = Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
+                            let sample = Sample::new(kexpr.clone(), value);
+                            query
+                                .reply(Ok(sample))
+                                .res()
+                                .await
+                                .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e)))?;
                         }
                     }
                     Box::pin( __run(self))
@@ -839,11 +871,10 @@ impl<'a> ZNServiceGenerator<'a> {
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn serve(
                     &self,
-                    stop: async_std::channel::Receiver<()>,
                     barrier : async_std::sync::Arc<async_std::sync::Barrier>,
                 ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Serve Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __serve<S>(_self: &#server_ident<S>, _stop: async_std::channel::Receiver<()>, _barrier : async_std::sync::Arc<async_std::sync::Barrier>) -> ZRPCResult<()>
+                    async fn __serve<S>(_self: &#server_ident<S>, _barrier : async_std::sync::Arc<async_std::sync::Barrier>) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                     {
@@ -859,31 +890,12 @@ impl<'a> ZNServiceGenerator<'a> {
 
                                 log::trace!("RPC Receiver loop started...");
                                 loop {
-                                    let run = async {
-                                        match _self.run().await {
-                                            Ok(_) => zrpc::RunResultAction::Restart(None),
-                                            Err(e) => zrpc::RunResultAction::Restart(Some(e)),
-                                        }
-                                    };
-                                    let stopper = async {
-                                        match _stop.recv().await {
-                                            Ok(_) => zrpc::RunResultAction::Stop,
-                                            Err(e) => zrpc::RunResultAction::StopError(ZRPCError::Error(format!("{}", e)))
-                                        }
-                                    };
-
-                                    match run.race(stopper).await {
-                                        zrpc::RunResultAction::Restart(e) => {
+                                    match _self.run().await {
+                                        Err(e) => {
                                             log::error!("The run loop existed with {:?}, restaring...", e);
-                                            continue;
                                         }
-                                        zrpc::RunResultAction::Stop => {
-                                            log::trace!("Received kill command, killing runner");
-                                            break Ok(());
-                                        }
-                                        zrpc::RunResultAction::StopError(e) => {
-                                            log::error!("The ZRPC stopper recv got an error: {}, exiting... maybe the sender was dropped?", e);
-                                            break Err(e);
+                                        Ok(_) => {
+                                            log::warn!("The run loop existed with unit restaring...");
                                         }
 
                                     }
@@ -892,17 +904,17 @@ impl<'a> ZNServiceGenerator<'a> {
                             _ => Err(ZRPCError::StateTransitionNotAllowed("State is not WORK, serve called directly? serve is called by calling work!".to_string())),
                         }
                     }
-                    let res  = __serve(self, stop, barrier);
+                    let res  = __serve(self, barrier);
                     Box::pin(res)
                 }
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
                 fn stop(
                     &self,
-                    stop: async_std::channel::Sender<()>,
+                    stop: zrpc::AbortHandle,
                 ) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Stop Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __stop<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
+                    async fn __stop<S>(_self: &#server_ident<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                     {
@@ -911,7 +923,8 @@ impl<'a> ZNServiceGenerator<'a> {
                             zrpc::ComponentStatus::SERVING => {
                                 ci.status = zrpc::ComponentStatus::REGISTERED;
                                 drop(ci);
-                                Ok(_stop.send(()).await?)
+                                _stop.abort();
+                                Ok(())
                             },
                             _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot stop a component in a state different than WORK".to_string())),
                         }
@@ -939,9 +952,9 @@ impl<'a> ZNServiceGenerator<'a> {
                 }
 
                 #[allow(clippy::type_complexity,clippy::manual_async_fn)]
-                fn disconnect(&self, stop: async_std::channel::Sender<()>) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
+                fn disconnect(&self, stop: zrpc::AbortHandle,) -> ::core::pin::Pin<Box<dyn std::future::Future<Output = ZRPCResult<()>> + '_>> {
                     log::trace!("Disconnect Service {} Instance {}", #service_name, self.instance_uuid());
-                    async fn __disconnect<S>(_self: &#server_ident<S>, _stop: async_std::channel::Sender<()>) -> ZRPCResult<()>
+                    async fn __disconnect<S>(_self: &#server_ident<S>, _stop: zrpc::AbortHandle) -> ZRPCResult<()>
                     where
                         S: #service_ident + Send + 'static,
                         {
@@ -950,7 +963,8 @@ impl<'a> ZNServiceGenerator<'a> {
                                 zrpc::ComponentStatus::HALTED => {
                                     ci.status = zrpc::ComponentStatus::HALTED;
                                     drop(ci);
-                                    Ok(_stop.send(()).await?)
+                                    _stop.abort();
+                                    Ok(())
                                 },
                                 _ => Err(ZRPCError::StateTransitionNotAllowed("Cannot disconnect a component in a state different than HALTED".to_string())),
                             }
@@ -1013,7 +1027,7 @@ impl<'a> ZNServiceGenerator<'a> {
         quote! {
             #[allow(unused)]
             #[derive(Clone, Debug)]
-            #vis struct #client_ident<C = zrpc::ZNClientChannel<#request_ident, #response_ident>>{
+            #vis struct #client_ident<C = zrpc::ZClientChannel<#request_ident, #response_ident>>{
                 ch : C,
                 server_uuid : Uuid,
             }
@@ -1035,7 +1049,7 @@ impl<'a> ZNServiceGenerator<'a> {
                     z : async_std::sync::Arc<zenoh::Session>,
                     instance_id : uuid::Uuid
                 ) -> #client_ident {
-                        let new_client = zrpc::ZNClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
+                        let new_client = zrpc::ZClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
                         #client_ident{
                             ch : new_client,
                             server_uuid : instance_id,
@@ -1052,29 +1066,38 @@ impl<'a> ZNServiceGenerator<'a> {
                 ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
                 {
                     async move {
-                        use futures::prelude::*;
-                        use zenoh::net::protocol::io::SplitBuffer;
+                        use zenoh::prelude::r#async::*;
+                        use zenoh::query::*;
+                        use zenoh::prelude::*;
+
 
                         let selector = format!("{}*/state",#eval_path);
                         log::trace!("Find servers selector {}", selector);
                         let mut servers = Vec::new();
 
-                        let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
+                        let replies = z.get(&selector).target(QueryTarget::All).res().await?;
 
-                        while let Some(d) = replies.next().await {
-                            let sample = d.sample;
-                            match sample.value.encoding {
-                                zenoh::prelude::Encoding::APP_OCTET_STREAM => {
-                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
+                        while let Ok(d) = replies.recv_async().await {
+                            match d.sample {
+                                Ok(sample) => match sample.value.encoding {
+                                    Encoding::APP_OCTET_STREAM => {
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
+                                            &sample.value.payload.contiguous(),
+                                        )?;
                                         servers.push(ca.uuid);
                                     }
-                                _ => {
-                                    return Err(ZRPCError::ZenohError(
-                                        "Server information is not correctly encoded".to_string(),
-                                    ))
+                                    _ => {
+                                        return Err(ZRPCError::ZenohError(
+                                            "Server information is not correctly encoded".to_string(),
+                                        ))
+                                    }
+                                },
+                                Err(e) => {
+                                    return Err(ZRPCError::ZenohError(format!(
+                                        "Unable to get sample from {:?}",e
+                                    )))
                                 }
                             }
-
                         }
                         Ok(servers)
                     }
@@ -1085,29 +1108,37 @@ impl<'a> ZNServiceGenerator<'a> {
                 ) -> impl std::future::Future<Output = ZRPCResult<Vec<zrpc::ComponentState>>> + 'static
                 {
                     async move {
-                        use futures::prelude::*;
-                        use zenoh::net::protocol::io::SplitBuffer;
+                        use zenoh::prelude::r#async::*;
+                        use zenoh::query::*;
+                        use zenoh::prelude::*;
 
                         let selector = format!("{}*/state",#eval_path);
                         log::trace!("Find servers selector {}", selector);
                         let mut servers = Vec::new();
 
-                        let mut replies = z.get(&selector).target(zenoh::query::QueryTarget {kind: zenoh::queryable::EVAL, target: zenoh::query::Target::All}).await?;
+                        let replies = z.get(&selector).target(QueryTarget::All).res().await?;
 
-                        while let Some(d) = replies.next().await {
-                            let sample = d.sample;
-                            match sample.value.encoding {
-                                zenoh::prelude::Encoding::APP_OCTET_STREAM => {
-                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(&sample.value.payload.contiguous().to_vec())?;
+                        while let Ok(d) = replies.recv_async().await {
+                            match d.sample {
+                                Ok(sample) => match sample.value.encoding {
+                                    Encoding::APP_OCTET_STREAM => {
+                                        let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
+                                            &sample.value.payload.contiguous(),
+                                        )?;
                                         servers.push(ca);
                                     }
-                                _ => {
-                                    return Err(ZRPCError::ZenohError(
-                                        "Server information is not correctly encoded".to_string(),
-                                    ))
+                                    _ => {
+                                        return Err(ZRPCError::ZenohError(
+                                            "Server information is not correctly encoded".to_string(),
+                                        ))
+                                    }
+                                },
+                                Err(e) => {
+                                    return Err(ZRPCError::ZenohError(format!(
+                                        "Unable to get sample from {:?}",e
+                                    )))
                                 }
                             }
-
                         }
                         Ok(servers)
                     }
@@ -1118,64 +1149,70 @@ impl<'a> ZNServiceGenerator<'a> {
                 ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
                 {
                     async move {
-                        use futures::prelude::*;
-                        use zenoh::net::protocol::io::SplitBuffer;
+                        use zenoh::prelude::r#async::*;
+                        use zenoh::query::*;
+                        use zenoh::prelude::*;
+                        use zrpc::zrpcresult::ZRPCError;
 
 
                         let servers = Self::find_servers_info(async_std::sync::Arc::clone(&z)).await?;
 
-                        let zinfo = z.info().await;
-                        let rid = match zinfo.get(&zenoh::info::ZN_INFO_ROUTER_PID_KEY) {
-                            Some(r_info) => {
-                                if !r_info.is_empty() {
-                                    r_info.split(',').collect::<Vec<_>>()[0].to_uppercase()
-                                } else {
-                                    return Err(ZRPCError::NoRouter)
-                                }
+                        let zinfo = z.info();
 
-                            },
-                            None => return Err(ZRPCError::NoRouter),
+                        let rid = match zinfo
+                            .routers_zid()
+                            .res()
+                            .await
+                            .collect::<Vec<ZenohId>>()
+                            .first()
+                        {
+                            Some(head) => head.to_string().to_uppercase(),
+                            None => "".to_string(),
                         };
+                        if rid == "" {
+                            return Ok(vec![])
+                        }
                         log::trace!("Router ID is {}", rid);
 
                         // This is a get from in the Router Admin space
-                        let selector = format!("/@/router/{}", rid);
+                        let selector = format!("@/router/{}", rid);
 
-                        let mut rdata: Vec<zenoh::query::Reply> = z.get(&selector).await?.collect().await;
+                        let mut rdata: Vec<Reply> = z.get(&selector).res().await?.into_iter().collect();
 
                         if rdata.is_empty() {
                             return Err(ZRPCError::NotFound);
                         }
 
                         let router_data = rdata.remove(0);
-                        let sample  = router_data.sample;
+                        match router_data.sample {
+                            Ok(sample) => match sample.value.encoding {
+                                Encoding::APP_JSON => {
+                                    let ri = zrpc::serialize::deserialize_router_info(
+                                        &sample.value.payload.contiguous(),
+                                    )?;
+                                    let r: Vec<Uuid> = servers
+                                        .into_iter()
+                                        .filter_map(|ci| {
+                                            let pid = String::from(&ci.peerid).to_uppercase();
+                                            let mut it = ri.clone().sessions.into_iter();
+                                            let f = it.find(|x| x.peer == pid.clone());
+                                            if f.is_none() {
+                                                None
+                                            } else {
+                                                Some(ci.uuid)
+                                            }
+                                        })
+                                        .collect();
 
-
-
-                        match sample.value.encoding {
-                            zenoh::prelude::Encoding::APP_JSON => {
-                                let ri = zrpc::serialize::deserialize_router_info(&sample.value.payload.contiguous().to_vec())?;
-                                let r: Vec<Uuid> = servers
-                                    .into_iter()
-                                    .filter_map(|ci| {
-                                        let pid = String::from(&ci.peerid).to_uppercase();
-                                        let mut it = ri.clone().sessions.into_iter();
-                                        let f = it.find(|x| x.peer == pid.clone());
-                                        if f.is_none() {
-                                            None
-                                        } else {
-                                            Some(ci.uuid)
-                                        }
-                                    })
-                                    .collect();
-
-                                Ok(r)
-                            }
-                            _ => {
-                                return Err(ZRPCError::ZenohError(
+                                    Ok(r)
+                                }
+                                _ => Err(ZRPCError::ZenohError(
                                     "Router information is not encoded in JSON".to_string(),
-                                ))
-                            }
+                                )),
+                            },
+                            Err(e) => Err(ZRPCError::ZenohError(format!(
+                                "Unable to get sample from {:?}",e
+                            ))),
                         }
                     }
                 }
@@ -1239,8 +1276,8 @@ impl<'a> ZNServiceGenerator<'a> {
     }
 }
 
-//Converts ZNServiceGenerator to actual code
-impl<'a> ToTokens for ZNServiceGenerator<'a> {
+//Converts ZServiceGenerator to actual code
+impl<'a> ToTokens for ZServiceGenerator<'a> {
     fn to_tokens(&self, output: &mut TokenStream2) {
         output.extend(vec![
             self.trait_service(),

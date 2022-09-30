@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 use std::str;
 use uuid::Uuid;
-use znrpc_macros::znservice;
+use zrpc_macros::zservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 
 static DEFAULT_INT: &str = "5";
@@ -29,9 +29,9 @@ struct CallArgs {
     duration: u64,
 }
 
-#[znservice(
+#[zservice(
     timeout_s = 60,
-    prefix = "/test",
+    prefix = "test",
     service_uuid = "00000000-0000-0000-0000-000000000001"
 )]
 pub trait Bench {
@@ -47,7 +47,7 @@ async fn main() {
     let rtts = Arc::new(AtomicU64::new(0));
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    let kind = "ZNRPC-RESP-DE";
+    let kind = "ZRPC-RESP-DE";
 
     let c = count.clone();
     let s = args.size;

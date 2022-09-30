@@ -1,5 +1,5 @@
 use structopt::StructOpt;
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 
 static DEFAULT_MODE: &str = "peer";
 static DEFAULT_SIZE: &str = "8";
@@ -26,18 +26,17 @@ async fn main() {
 
     match args.peer {
         Some(peer) => {
-            let peers: Vec<Locator> = vec![peer.clone().parse().unwrap()];
-            config.set_peers(peers).unwrap();
+            config.connect.endpoints.extend(vec![peer.parse().unwrap()]);
         }
         None => (),
     };
-    let zenoh = zenoh::open(config).await.unwrap();
+    let zenoh = zenoh::open(config).res().await.unwrap();
 
-    let path = String::from("/test/thr");
+    let path = String::from("test/thr");
     let data = vec![0; args.size as usize];
     let value = Value::new(data.into());
 
     loop {
-        zenoh.put(&path, value.clone()).await.unwrap();
+        zenoh.put(&path, value.clone()).res().await.unwrap();
     }
 }

@@ -1,5 +1,7 @@
+use std::io::{stdin, Read};
+
 //
-// Copyright (c) 2017, 2020 ADLINK Technology Inc.
+// Copyright (c) 2022 ZettaScale Technology
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License 2.0 which is available at
@@ -9,11 +11,12 @@
 // SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 //
 // Contributors:
-//   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+//   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 use clap::{App, Arg};
 use zenoh::config::Config;
-use zenoh::prelude::*;
+use zenoh::prelude::keyexpr;
+use zenoh::prelude::sync::{SessionDeclarations, SyncResolve};
 use zenoh::publication::CongestionControl;
 
 fn main() {
@@ -22,24 +25,26 @@ fn main() {
 
     let config = parse_args();
 
-    let session = zenoh::open(config).wait().unwrap();
+    let session = zenoh::open(config).res().unwrap().into_arc();
 
     // The key expression to read the data from
-    let key_expr_ping = session.declare_expr("/test/ping").wait().unwrap();
+    let key_expr_ping = keyexpr::new("test/ping").unwrap();
 
     // The key expression to echo the data back
-    let key_expr_pong = session.declare_expr("/test/pong").wait().unwrap();
+    let key_expr_pong = keyexpr::new("test/pong").unwrap();
 
-    let mut sub = session.subscribe(&key_expr_ping).wait().unwrap();
+    let publisher = session
+        .declare_publisher(key_expr_pong)
+        .congestion_control(CongestionControl::Block)
+        .res()
+        .unwrap();
 
-    while let Ok(sample) = sub.receiver().recv() {
-        session
-            .put(&key_expr_pong, sample.value)
-            // Make sure to not drop messages because of congestion control
-            .congestion_control(CongestionControl::Block)
-            .wait()
-            .unwrap();
-    }
+    let _sub = session
+        .declare_subscriber(key_expr_ping)
+        .callback(move |sample| publisher.put(sample.value).res().unwrap())
+        .res()
+        .unwrap();
+    for _ in stdin().bytes().take_while(|b| !matches!(b, Ok(b'q'))) {}
 }
 
 fn parse_args() -> Config {
@@ -49,10 +54,10 @@ fn parse_args() -> Config {
                 .possible_values(&["peer", "client"]),
         )
         .arg(Arg::from_usage(
-            "-e, --peer=[LOCATOR]...   'Peer locators used to initiate the zenoh session.'",
+            "-e, --connect=[ENDPOINT]...   'Endpoints to connect to.'",
         ))
         .arg(Arg::from_usage(
-            "-l, --listener=[LOCATOR]...   'Locators to listen on.'",
+            "-l, --listen=[ENDPOINT]...   'Endpoints to listen on.'",
         ))
         .arg(Arg::from_usage(
             "--no-multicast-scouting 'Disable the multicast-based scouting mechanism.'",
@@ -67,18 +72,17 @@ fn parse_args() -> Config {
     if let Some(Ok(mode)) = args.value_of("mode").map(|mode| mode.parse()) {
         config.set_mode(Some(mode)).unwrap();
     }
-    match args.value_of("mode").map(|m| m.parse()) {
-        Some(Ok(mode)) => {
-            config.set_mode(Some(mode)).unwrap();
-        }
-        Some(Err(())) => panic!("Invalid mode"),
-        None => {}
-    };
-    if let Some(values) = args.values_of("peer") {
-        config.peers.extend(values.map(|v| v.parse().unwrap()))
+    if let Some(values) = args.values_of("connect") {
+        config
+            .connect
+            .endpoints
+            .extend(values.map(|v| v.parse().unwrap()))
     }
-    if let Some(values) = args.values_of("listeners") {
-        config.listeners.extend(values.map(|v| v.parse().unwrap()))
+    if let Some(values) = args.values_of("listen") {
+        config
+            .listen
+            .endpoints
+            .extend(values.map(|v| v.parse().unwrap()))
     }
     if args.is_present("no-multicast-scouting") {
         config.scouting.multicast.set_enabled(Some(false)).unwrap();

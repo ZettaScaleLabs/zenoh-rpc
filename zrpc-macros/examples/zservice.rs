@@ -1,3 +1,16 @@
+/*********************************************************************************
+* Copyright (c) 2022 ZettaScale Technology
+*
+* This program and the accompanying materials are made available under the
+* terms of the Eclipse Public License 2.0 which is available at
+* http://www.eclipse.org/legal/epl-2.0, or the Apache Software License 2.0
+* which is available at https://www.apache.org/licenses/LICENSE-2.0.
+*
+* SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+* Contributors:
+*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+*********************************************************************************/
+
 #![allow(clippy::manual_async_fn)]
 #![allow(clippy::large_enum_variant)]
 
@@ -12,11 +25,12 @@ use std::time::Duration;
 use uuid::Uuid;
 
 //importing the macros
-use znrpc_macros::{znserver, znservice};
+use zenoh::prelude::r#async::*;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::ZNServe;
+use zrpc::ZServe;
+use zrpc_macros::{zserver, zservice};
 
-#[znservice(timeout_s = 60, prefix = "/lfos")]
+#[zservice(timeout_s = 60, prefix = "zrpc-tests")]
 pub trait Hello {
     async fn hello(&self, name: String) -> String;
     async fn add(&mut self) -> u64;
@@ -28,7 +42,7 @@ struct HelloZService {
     pub counter: Arc<Mutex<u64>>,
 }
 
-#[znserver]
+#[zserver]
 impl Hello for HelloZService {
     async fn hello(&self, name: String) -> String {
         format!("Hello {}!, you are connected to {}", name, self.ser_name)
@@ -48,7 +62,7 @@ async fn main() {
     config
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
-    let zsession = Arc::new(zenoh::open(config).await.unwrap());
+    let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
     let service = HelloZService {
         ser_name: "test service".to_string(),
@@ -109,7 +123,7 @@ async fn main() {
     server.unregister().await.unwrap();
     server.disconnect(stopper).await.unwrap();
 
-    handle.await.unwrap();
+    let _ = handle.await;
 
     // this should return an error as the server is not there
     // let hello = client.hello("client".to_string()).await;

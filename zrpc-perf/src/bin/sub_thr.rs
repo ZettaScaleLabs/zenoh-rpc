@@ -43,7 +43,7 @@ async fn main() {
     };
     let zenoh = zenoh::open(config).await.unwrap();
 
-    let reskey = String::from("/test/thr");
+    let reskey = String::from("test/thr");
 
     let kind = if args.mode == "peer" {
         "PP-NET-SUB"

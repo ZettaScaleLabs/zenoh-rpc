@@ -1,5 +1,5 @@
 /*********************************************************************************
-* Copyright (c) 2018,2020 ADLINK Technology Inc.
+* Copyright (c) 2022 ZettaScale Technology
 *
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
@@ -8,7 +8,7 @@
 *
 * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
 * Contributors:
-*   ADLINK fog05 team, <fog05@adlink-labs.tech>
+*   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
 extern crate serde;
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
-#[derive(Error, Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Error, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ZRPCError {
     DeserializationError(String),
     SerializationError(String),

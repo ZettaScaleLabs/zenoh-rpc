@@ -22,7 +22,7 @@ GET_BIN="get"
 
 
 
-NCALL_BIN="znrpc_call"
+NCALL_BIN="zrpc_call"
 
 EVAL_BIN="eval"
 GET_EVAL_BIN="get_eval"
@@ -77,7 +77,7 @@ plog "Running baseline get bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
+   nohup $ZENOHD_PATH --mem-storage "test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
    ZENOHD_PID=$!
    plog "Zenohd running PID $ZENOHD_PID"
    plog "Running GET bench with $x size"
@@ -96,7 +96,7 @@ plog "Running baseline get queryable bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
+   nohup $ZENOHD_PATH --mem-storage "test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
    ZENOHD_PID=$!
    plog "Zenohd running PID $ZENOHD_PID"
    nohup $BIN_DIR/$NET_EVAL_BIN -m client -p tcp/127.0.0.1:7447 -s $x > /dev/null 2>&1 &
@@ -131,7 +131,7 @@ plog "Running baseline eval bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
+   nohup $ZENOHD_PATH --mem-storage "test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
    ZENOHD_PID=$!
    plog "Zenohd running PID $ZENOHD_PID"
    nohup $BIN_DIR/$EVAL_BIN -m client -p tcp/127.0.0.1:7447 -s $x > /dev/null 2>&1 &
@@ -146,61 +146,61 @@ do
 done
 
 
-plog "Running ZNRPC Call bench"
+plog "Running ZRPC Call bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
    plog "Starting zenohd..."
-   nohup $ZENOHD_PATH --mem-storage "/test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
+   nohup $ZENOHD_PATH --mem-storage "test/**" -l tcp/127.0.0.1:7447 > /dev/null 2>&1 &
    ZENOHD_PID=$!
    plog "Zenohd running PID $ZENOHD_PID"
    sleep 2
    nohup $BIN_DIR/$NCALL_BIN -z client -m server -r tcp/127.0.0.1:7447 -s $x > /tmp/server.out 2>&1 &
    SERVER_PID=$!
-   plog "ZNRPC Server running $SERVER_PID"
+   plog "ZRPC Server running $SERVER_PID"
    sleep 6
-   plog "Running ZNRPC call bench with $x size"
+   plog "Running ZRPC call bench with $x size"
    $BIN_DIR/$NCALL_BIN -d $DURATION -z client -i 1 -m client -r tcp/127.0.0.1:7447 -s $x > $OUT_DIR/zcall-$x-$TS.csv
-   plog "Done ZNRPC Call bench, killing server and zenoh"
+   plog "Done ZRPC Call bench, killing server and zenoh"
    kill -9 $SERVER_PID
    kill -9 $ZENOHD_PID
    x=$(( $x * 2 ))
 done
 
 
-plog "Running P2P ZNRPC Call bench"
+plog "Running P2P ZRPC Call bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
    nohup $BIN_DIR/$NCALL_BIN -z peer -m server -s $x > /tmp/server.out 2>&1 &
    SERVER_PID=$!
-   plog "P2P ZNRPC Server running $SERVER_PID"
+   plog "P2P ZRPC Server running $SERVER_PID"
    sleep 5
-   plog "Running P2P ZNRPC call bench with $x size"
+   plog "Running P2P ZRPC call bench with $x size"
    $BIN_DIR/$NCALL_BIN -d $DURATION -z peer -i 1 -m client -s $x > $OUT_DIR/p2p-zcall-$x-$TS.csv
-   plog "Done P2P ZNRPC Call bench, killing server and zenoh"
+   plog "Done P2P ZRPC Call bench, killing server and zenoh"
    kill -9 $SERVER_PID
    x=$(( $x * 2 ))
 done
 
 
-plog "Running ZNRPC Response Serialization bench"
+plog "Running ZRPC Response Serialization bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
-   plog "Running ZNRPC Response Serialization bench with $x size"
+   plog "Running ZRPC Response Serialization bench with $x size"
    $BIN_DIR/$SER_BIN -d $DURATION -i 1 -s $x > $OUT_DIR/serialize-$x-$TS.csv
-   plog "Done ZNRPC Response Serialization"
+   plog "Done ZRPC Response Serialization"
    x=$(( $x * 2 ))
 done
 
-plog "Running ZNRPC Response Deserialization bench"
+plog "Running ZRPC Response Deserialization bench"
 x=$INITIAL_SIZE
 while [ $x -le $END_SIZE ]
 do
-   plog "Running ZNRPC Response Deserialization bench with $x size"
+   plog "Running ZRPC Response Deserialization bench with $x size"
    $BIN_DIR/$DE_BIN -d $DURATION -i 1 -s $x > $OUT_DIR/deserialize-$x-$TS.csv
-   plog "Done ZNRPC Response Deserialization"
+   plog "Done ZRPC Response Deserialization"
    x=$(( $x * 2 ))
 done
 
