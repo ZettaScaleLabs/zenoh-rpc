@@ -19,9 +19,8 @@ serde_json = { version = "=1", optional = true }
 serde_yaml = { version = "=0.9", optional = true }
 thiserror = "=1.0"
 uuid = { version = "=1.1", features = ["serde", "v4"] }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-
+zenoh = { version = "=0.6.0-beta.1", default-features = false }
+zenoh-util = { version = "=0.6.0-beta.1" }
 [features]
 #zenoh feature re-exports
 auth_pubkey = ["zenoh/auth_pubkey"]
