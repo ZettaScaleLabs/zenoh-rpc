@@ -34,6 +34,7 @@ use zrpc_macros::{zserver, zservice};
 pub trait Hello {
     async fn hello(&self, name: String) -> String;
     async fn add(&mut self) -> u64;
+    async fn test_serde_json_value(&self, value: serde_json::Value) -> bool;
 }
 
 #[derive(Clone)]
@@ -52,6 +53,13 @@ impl Hello for HelloZService {
         let mut guard = self.counter.lock().await;
         *guard += 1;
         *guard
+    }
+
+    async fn test_serde_json_value(&self, value: serde_json::Value) -> bool {
+        match value {
+            serde_json::Value::Bool(b) => b,
+            _ => false,
+        }
     }
 }
 
@@ -113,6 +121,10 @@ async fn main() {
     println!("Res is: {:?}", res);
 
     let res = client.add().await;
+    println!("Res is: {:?}", res);
+
+    let req = serde_json::Value::Bool(true);
+    let res = client.test_serde_json_value(req).await;
     println!("Res is: {:?}", res);
 
     server.stop(s).await.unwrap();
