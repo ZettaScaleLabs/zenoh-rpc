@@ -21,6 +21,7 @@ thiserror = "=1.0"
 uuid = { version = "=1.1", features = ["serde", "v4"] }
 zenoh = { version = "=0.6.0-beta.1", default-features = false }
 zenoh-util = { version = "=0.6.0-beta.1" }
+
 [features]
 #zenoh feature re-exports
 auth_pubkey = ["zenoh/auth_pubkey"]
@@ -50,9 +51,4 @@ state_cbor = ["serde_cbor"]
 
 router_json = ["serde_json"]
 
-default = ["resp_cbor", "send_cbor", "state_cbor", "router_json", "transport_tcp", "transport_udp"]
-
-
-
-
-
+default = ["resp_json", "send_json", "state_json", "router_json", "transport_tcp", "transport_udp"]
