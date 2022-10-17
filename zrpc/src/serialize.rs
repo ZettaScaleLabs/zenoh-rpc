@@ -138,6 +138,9 @@ where
     #[cfg(feature = "send_json")]
     return Ok(serde_json::from_str::<T>(std::str::from_utf8(raw_data)?)?);
 
+    #[cfg(feature = "send_bincode")]
+    return Ok(bincode::deserialize::<T>(&raw_data)?);
+
     #[cfg(feature = "send_cbor")]
     return Ok(serde_cbor::from_slice::<T>(raw_data)?);
 }
