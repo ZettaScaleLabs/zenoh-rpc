@@ -12,9 +12,9 @@ use zenoh::prelude::r#async::*;
 
 use std::str;
 use uuid::Uuid;
-use zrpc_macros::{zserver, zservice};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::ZServe;
+use zrpc_macros::{zserver, zservice};
 
 static DEFAULT_MODE: &str = "client";
 static DEFAULT_ZMODE: &str = "peer";
@@ -87,7 +87,10 @@ async fn client(args: CallArgs) {
         .unwrap();
 
     if args.zenoh_mode == "client" {
-        config.connect.endpoints.extend(vec![args.router.parse().unwrap()]);
+        config
+            .connect
+            .endpoints
+            .extend(vec![args.router.parse().unwrap()]);
     }
     let zenoh = Arc::new(zenoh::open(config).res().await.unwrap());
 
@@ -140,7 +143,10 @@ async fn server(args: CallArgs) {
         .unwrap();
 
     if args.zenoh_mode == "client" {
-        config.connect.endpoints.extend(vec![args.router.parse().unwrap()]);
+        config
+            .connect
+            .endpoints
+            .extend(vec![args.router.parse().unwrap()]);
     }
 
     let zenoh = Arc::new(zenoh::open(config).res().await.unwrap());

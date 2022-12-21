@@ -10,8 +10,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use uuid::Uuid;
-use zrpc_macros::zservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
+use zrpc_macros::zservice;
 
 static DEFAULT_INT: &str = "5";
 static DEFAULT_SIZE: &str = "8";

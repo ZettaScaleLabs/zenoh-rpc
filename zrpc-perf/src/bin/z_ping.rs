@@ -78,7 +78,11 @@ async fn main() {
         // The resource to wait the response back
         let reskey_pong = String::from("test/pong");
 
-        let sub = c_session.declare_subscriber(&reskey_pong).res().await.unwrap();
+        let sub = c_session
+            .declare_subscriber(&reskey_pong)
+            .res()
+            .await
+            .unwrap();
 
         // Wait for the both publishers and subscribers to be declared
         c_barrier.wait().await;
