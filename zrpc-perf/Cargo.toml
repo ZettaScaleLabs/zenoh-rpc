@@ -1,12 +1,14 @@
 [package]
 name = "zrpc-perf"
 version = "0.5.1-alpha1"
-repository = "https://github.com/eclipse-fog05/fog05"
-homepage = "http://fog05.io"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
+categories = ["network-programming"]
+description = "Zenoh-Flow: a Zenoh-based data flow programming framework for computations that span from the cloud to the device."
 edition = "2018"
+homepage = "https://github.com/ZettaScaleLabs/zenoh-rpc"
 license = " EPL-2.0 OR Apache-2.0"
-description = "fog05: The End-to-End Compute, Storage and Networking Virtualisation solution."
+readme = "README.md"
+repository = "https://github.com/ZettaScaleLabs/zenoh-rpc"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # To build with debug on macros: RUSTFLAGS="-Z macro-backtrace"
