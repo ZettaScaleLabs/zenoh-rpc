@@ -301,30 +301,36 @@ where
 
                 log::debug!("Received query {:?}", query);
                 let selector = query.selector();
-                let parsed_selector = selector.parameters_cowmap()?;
-                let base64_req = parsed_selector.get("req").ok_or(ZRPCError::MissingValue)?;
-                let b64_bytes = base64::decode(base64_req.as_bytes())?;
-                let req = zrpc::serialize::deserialize_request::<HelloRequest>(&b64_bytes)?;
+                match query.value() {
+                    Some(value) => {
+                        let req = zrpc::serialize::deserialize_request::<HelloRequest>(
+                            &value.payload.contiguous(),
+                        )?;
 
-                let mut ser = _self.server.clone();
-                let encoded_resp = match req {
-                    HelloRequest::Hello { name } => {
-                        let resp = HelloResponse::Hello(ser.hello(name).await);
-                        zrpc::serialize::serialize_response(&resp)
-                    }
-                    HelloRequest::Add {} => {
-                        let resp = HelloResponse::Add(ser.add().await);
-                        zrpc::serialize::serialize_response(&resp)
-                    }
-                }?;
-                let value = Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
-                let sample = Sample::new(kexpr.clone(), value);
+                        let mut ser = _self.server.clone();
+                        let encoded_resp = match req {
+                            HelloRequest::Hello { name } => {
+                                let resp = HelloResponse::Hello(ser.hello(name).await);
+                                zrpc::serialize::serialize_response(&resp)
+                            }
+                            HelloRequest::Add {} => {
+                                let resp = HelloResponse::Add(ser.add().await);
+                                zrpc::serialize::serialize_response(&resp)
+                            }
+                        }?;
+                        let value =
+                            Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
+                        let sample = Sample::new(kexpr.clone(), value);
 
-                query
-                    .reply(Ok(sample))
-                    .res()
-                    .await
-                    .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{e:?}")))?;
+                        query.reply(Ok(sample)).res().await.map_err(|e| {
+                            zrpc::zrpcresult::ZRPCError::ZenohError(format!("{e:?}"))
+                        })?;
+                    }
+                    None => log::error!(
+                        "Received query on {:?} without value, not replying!",
+                        selector
+                    ),
+                }
             }
         }
 

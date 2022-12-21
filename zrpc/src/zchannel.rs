@@ -61,14 +61,15 @@ where
     /// passed as a property named req
     async fn send(&self, request: &Req) -> ZRPCResult<Receiver<Reply>> {
         let req = serialize::serialize_request(&request)?;
-        let selector = format!(
-            "{}{}/eval?req={}",
-            self.path,
-            self.server_uuid.unwrap(),
-            base64::encode(req)
-        );
+        let selector = format!("{}{}/eval", self.path, self.server_uuid.unwrap());
         trace!("Sending {:?} to  {:?}", request, selector);
-        Ok(self.z.get(&selector).target(QueryTarget::All).res().await?)
+        Ok(self
+            .z
+            .get(&selector)
+            .with_value(req)
+            .target(QueryTarget::All)
+            .res()
+            .await?)
     }
 
     /// This function calls the eval on the server and deserialized the result

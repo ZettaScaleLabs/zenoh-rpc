@@ -839,30 +839,33 @@ impl<'a> ZServiceGenerator<'a> {
                             let query = queryable.recv_async().await.map_err(|_| zrpc::zrpcresult::ZRPCError::MissingValue)?;
                             log::trace!("Received query {:?}", query);
                             let query_selector = query.selector();
-                            let parsed_selector = query_selector.parameters_cowmap()?;
-                            let base64_req = parsed_selector.get("req").ok_or(zrpc::zrpcresult::ZRPCError::MissingValue)?;
-                            let b64_bytes = base64::decode(base64_req.as_bytes())?;
-                            let req = zrpc::serialize::deserialize_request::<#request_ident>(&b64_bytes)?;
-                            log::trace!("Received on {:?} {:?}", path, req);
 
-                            let mut ser = _self.server.clone();
+                            match query.value(){
+                                Some(value) => {
+                                    let req = zrpc::serialize::deserialize_request::<#request_ident>(&value.payload.contiguous())?;
+                                    log::trace!("Received on {:?} {:?}", path, req);
 
-                            let encoded_resp  = match req.clone() {
-                                #(
-                                    #request_ident::#camel_case_idents{#(#arg_pats),*} => {
-                                        let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
-                                        log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
-                                        zrpc::serialize::serialize_response(&resp)
-                                    }
-                                )*
-                            }?;
-                            let value = Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
-                            let sample = Sample::new(kexpr.clone(), value);
-                            query
-                                .reply(Ok(sample))
-                                .res()
-                                .await
-                                .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e)))?;
+                                    let mut ser = _self.server.clone();
+
+                                    let encoded_resp  = match req.clone() {
+                                        #(
+                                            #request_ident::#camel_case_idents{#(#arg_pats),*} => {
+                                                let resp = #response_ident::#camel_case_idents(ser.#method_idents( #(#arg_pats),*).await);
+                                                log::trace!("Reply to {:?} {:?} with {:?}", path, req, resp);
+                                                zrpc::serialize::serialize_response(&resp)
+                                            }
+                                        )*
+                                    }?;
+                                    let value = Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
+                                    let sample = Sample::new(kexpr.clone(), value);
+                                    query
+                                        .reply(Ok(sample))
+                                        .res()
+                                        .await
+                                        .map_err(|e| zrpc::zrpcresult::ZRPCError::ZenohError(format!("{:?}",e)))?;
+                                }
+                                None => log::error!("Received query on {:?} without value, not replying!", query_selector)
+                            }
                         }
                     }
                     Box::pin( __run(self))
