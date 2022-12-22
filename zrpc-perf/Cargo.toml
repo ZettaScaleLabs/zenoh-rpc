@@ -1,6 +1,6 @@
 [package]
 name = "zrpc-perf"
-version = "0.5.1-alpha1"
+version = "0.6.0-alpha1"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 categories = ["network-programming"]
 description = "Framework for decentralized and distributed microservices over Zenoh."
@@ -23,8 +23,8 @@ serde_derive = "1.0.55"
 serde = { version = "1.0.55", features = ["derive"] }
 zenoh = { version = "=0.7.0-rc", default-features = false }
 zenoh-util = { version = "=0.7.0-rc" }
-zrpc = {path = "../zrpc"}
-zrpc-macros = {path = "../zrpc-macros"}
+zrpc = {version = "0.6.0-alpha1", path = "../zrpc"}
+zrpc-macros = {version = "0.6.0-alpha1", path = "../zrpc-macros"}
 base64 = "0.20.0"
 log = "0.4.11"
 uuid = { version = "1.1", features = ["serde", "v4"] }
