@@ -1,6 +1,6 @@
 [package]
 name = "zrpc"
-version = "0.6.0-alpha1"
+version = "0.6.0-alpha2"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 categories = ["network-programming"]
 description = "Framework for decentralized and distributed microservices over Zenoh."
