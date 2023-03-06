@@ -42,6 +42,8 @@ transport_udp = ["zenoh/transport_udp"]
 transport_unixsock-stream = ["zenoh/transport_unixsock-stream"]
 transport_ws = ["zenoh/transport_ws"]
 
+query_payload = ["zenoh/unstable"]
+
 resp_bincode = ["bincode"]
 send_bincode = ["bincode"]
 
@@ -57,4 +59,4 @@ state_cbor = ["serde_cbor"]
 
 router_json = ["serde_json"]
 
-default = ["resp_json", "send_json", "state_json", "router_json", "transport_tcp", "transport_udp", "zenoh/unstable"]
+default = ["resp_json", "send_json", "state_json", "router_json", "transport_tcp", "transport_udp", "query_payload"]
