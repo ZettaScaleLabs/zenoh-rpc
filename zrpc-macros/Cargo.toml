@@ -19,8 +19,8 @@ base64 = "=0.20.0"
 darling = "=0.14"
 futures = "=0.3.25"
 log = "=0.4"
-proc-macro2 = "=1.0.49"
-quote = "=1.0.23"
+proc-macro2 = "=1.0.56"
+quote = "=1.0.26"
 serde = { version = "=1.0.151", features = ["derive"] }
 serde_derive = "=1.0.151"
 syn = { version = "=1.0.107", features = ["full"] }
