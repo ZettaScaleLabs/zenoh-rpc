@@ -1,32 +1,32 @@
 [package]
 name = "zrpc"
-version = "0.7.0"
-authors = ["gabrik <gabriele.baldoni@gmail.com>"]
-categories = ["network-programming"]
-description = "Framework for decentralized and distributed microservices over Zenoh."
-edition = "2018"
-homepage = "https://github.com/ZettaScaleLabs/zenoh-rpc"
-license = " EPL-2.0 OR Apache-2.0"
-readme = "../README.md"
-repository = "https://github.com/ZettaScaleLabs/zenoh-rpc"
+version.workspace = true
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-std = { version = "=1.12.0", features = ["attributes"] }
-base64 = "=0.20.0"
+base64 = "0.21.0"
 bincode = { version = "=1.3.3", optional = true }
 flume = { version = "=0.10" }
-futures = "=0.3.25"
+futures = "0.3.28"
 log = "=0.4"
-serde = { version = "=1.0.151", features = ["derive"] }
-serde_cbor = { version = "=0.11", optional = true }
-serde_derive = "=1.0.151"
+serde = { version = "=1.0.160", features = ["derive"] }
+serde_cbor = { version = "=0.11.2", optional = true }
+serde_derive = "=1.0.160"
 serde_json = { version = "=1", optional = true }
 serde_yaml = { version = "=0.9", optional = true }
 thiserror = "=1.0"
-uuid = { version = "=1.2.2", features = ["serde", "v4"] }
-zenoh = { version = "=0.7.0-rc", default-features = false }
-zenoh-util = { version = "=0.7.0-rc" }
+uuid = { version = "=1.3.1", features = ["serde", "v4"] }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", default-features = false }
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
 
 [features]
 #zenoh feature re-exports
