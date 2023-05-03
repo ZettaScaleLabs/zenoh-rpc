@@ -279,7 +279,6 @@ where
         where
             S: Hello + Send + 'static,
         {
-            use std::convert::TryInto;
             use zenoh::prelude::r#async::*;
 
             let path = format!(
