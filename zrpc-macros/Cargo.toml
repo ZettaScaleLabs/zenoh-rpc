@@ -23,7 +23,7 @@ proc-macro2 = "=1.0.56"
 quote = "=1.0.26"
 serde = { version = "=1.0.151", features = ["derive"] }
 serde_derive = "=1.0.151"
-syn = { version = "=1.0.107", features = ["full"] }
+syn = { version = "=1.0.107", features = ["full", "visit-mut"] }
 syn-serde = { version = "=0.2", features = ["json"] }
 uhlc = "=0.5"
 uuid = { version = "=1.2.2", features = ["serde", "v4"] }
