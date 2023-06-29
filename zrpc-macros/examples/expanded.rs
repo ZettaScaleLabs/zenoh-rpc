@@ -22,10 +22,10 @@ use std::prelude::v1::*;
 
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
+use zenoh::prelude::ZenohId;
 
 use std::str;
 use std::time::Duration;
-use uuid::Uuid;
 use zenoh::Session;
 
 use serde::{Deserialize, Serialize};
@@ -44,9 +44,9 @@ pub trait Hello: Clone {
     fn get_hello_server(
         self,
         z: async_std::sync::Arc<zenoh::Session>,
-        id: Option<uuid::Uuid>,
+        id: Option<ZenohId>,
     ) -> ServeHello<Self> {
-        let id = id.unwrap_or_else(Uuid::new_v4);
+        let id = id.unwrap_or_else(ZenohId::rand);
         ServeHello::new(z, self, id)
     }
 }
@@ -55,12 +55,12 @@ pub trait Hello: Clone {
 pub struct ServeHello<S> {
     z: async_std::sync::Arc<zenoh::Session>,
     server: S,
-    instance_id: uuid::Uuid,
+    instance_id: ZenohId,
     state: async_std::sync::Arc<async_std::sync::RwLock<zrpc::ComponentState>>,
 }
 
 impl<S> ServeHello<S> {
-    pub fn new(z: async_std::sync::Arc<zenoh::Session>, server: S, id: uuid::Uuid) -> Self {
+    pub fn new(z: async_std::sync::Arc<zenoh::Session>, server: S, id: ZenohId) -> Self {
         let ci = zrpc::ComponentState {
             uuid: id,
             name: "HelloService".to_string(),
@@ -81,7 +81,7 @@ where
     S: Hello + Send + 'static,
 {
     type Resp = HelloResponse;
-    fn instance_uuid(&self) -> uuid::Uuid {
+    fn instance_uuid(&self) -> ZenohId {
         self.instance_id
     }
 
@@ -465,11 +465,11 @@ pub enum HelloResponse {
 #[derive(Clone, Debug)]
 pub struct HelloClient<C = zrpc::ZClientChannel<HelloRequest, HelloResponse>> {
     ch: C,
-    server_uuid: Uuid,
+    server_uuid: ZenohId,
 }
 
 impl HelloClient {
-    pub fn new(z: async_std::sync::Arc<zenoh::Session>, instance_id: uuid::Uuid) -> HelloClient {
+    pub fn new(z: async_std::sync::Arc<zenoh::Session>, instance_id: ZenohId) -> HelloClient {
         let new_client = zrpc::ZClientChannel::new(
             z,
             "zservice/Hello/2967c40b-a9a4-4330-b5f6-e0315b2356a9/".to_string(),
@@ -480,12 +480,12 @@ impl HelloClient {
             server_uuid: instance_id,
         }
     }
-    pub fn get_server_uuid(&self) -> Uuid {
+    pub fn get_server_uuid(&self) -> ZenohId {
         self.server_uuid
     }
     pub fn find_servers(
         z: async_std::sync::Arc<Session>,
-    ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static {
+    ) -> impl std::future::Future<Output = ZRPCResult<Vec<ZenohId>>> + 'static {
         async move {
             use zenoh::prelude::r#async::*;
 
@@ -558,7 +558,7 @@ impl HelloClient {
     }
     pub fn find_local_servers(
         z: async_std::sync::Arc<zenoh::Session>,
-    ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static {
+    ) -> impl std::future::Future<Output = ZRPCResult<Vec<ZenohId>>> + 'static {
         async move {
             use zenoh::prelude::r#async::*;
             use zenoh::query::*;
@@ -594,7 +594,7 @@ impl HelloClient {
                         let ri = zrpc::serialize::deserialize_router_info(
                             &sample.value.payload.contiguous(),
                         )?;
-                        let r: Vec<Uuid> = servers
+                        let r: Vec<ZenohId> = servers
                             .into_iter()
                             .filter_map(|ci| {
                                 let pid = String::from(&ci.peerid).to_uppercase();

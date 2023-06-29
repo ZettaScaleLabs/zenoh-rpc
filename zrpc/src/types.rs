@@ -18,7 +18,7 @@ extern crate serde_json;
 //extern crate serde_yaml;
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use zenoh::prelude::ZenohId;
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ComponentStatus {
@@ -30,7 +30,7 @@ pub enum ComponentStatus {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ComponentState {
-    pub uuid: Uuid,
+    pub uuid: ZenohId,
     pub name: String,
     pub routerid: String,
     pub peerid: String,

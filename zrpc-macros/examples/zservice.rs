@@ -22,7 +22,6 @@ use async_std::task;
 
 use std::str;
 use std::time::Duration;
-use uuid::Uuid;
 
 //importing the macros
 use zenoh::prelude::r#async::*;

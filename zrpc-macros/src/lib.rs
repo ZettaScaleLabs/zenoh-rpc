@@ -40,6 +40,7 @@ use syn::{
     ItemImpl, Pat, PatIdent, PatType, Receiver, ReturnType, Signature, Token, Type, Visibility,
 };
 use syn_serde::json;
+use zenoh::prelude::ZenohId;
 
 mod receiver;
 use receiver::ReplaceReceiver;
@@ -231,8 +232,8 @@ pub fn zservice(attr: TokenStream, input: TokenStream) -> TokenStream {
     let args: &[&[PatType]] = &evals.iter().map(|eval| &*eval.args).collect::<Vec<_>>();
 
     let service_uuid = match macro_args.service_uuid {
-        Some(u) => uuid::Uuid::from_str(&u).unwrap(),
-        None => uuid::Uuid::new_v4(),
+        Some(u) => ZenohId::from_str(&u).unwrap(),
+        None => ZenohId::rand(),
     };
 
     //service eval path
@@ -549,8 +550,8 @@ impl<'a> ZServiceGenerator<'a> {
             #(#fns)*
 
             /// Returns the server object
-            fn #service_get_server_ident(self, z : async_std::sync::Arc<zenoh::Session>, id : Option<uuid::Uuid>) -> #server_ident<Self>{
-                let id = id.unwrap_or_else(Uuid::new_v4);
+            fn #service_get_server_ident(self, z : async_std::sync::Arc<zenoh::Session>, id : Option<zenoh::prelude::ZenohId>) -> #server_ident<Self>{
+                let id = id.unwrap_or_else(zenoh::prelude::ZenohId::rand);
                 log::trace!("Getting Server with ID {}", id);
                 #server_ident::new(z,self, id)
                 }
@@ -573,12 +574,12 @@ impl<'a> ZServiceGenerator<'a> {
             #vis struct #server_ident<S> {
                 z : async_std::sync::Arc<zenoh::Session>,
                 server: S,
-                instance_id: uuid::Uuid,
+                instance_id: zenoh::prelude::ZenohId,
                 state : async_std::sync::Arc<async_std::sync::RwLock<zrpc::ComponentState>>
             }
 
             impl<S> #server_ident<S> {
-                pub fn new(z : async_std::sync::Arc<zenoh::Session>, server : S, id : uuid::Uuid) -> Self {
+                pub fn new(z : async_std::sync::Arc<zenoh::Session>, server : S, id : zenoh::prelude::ZenohId) -> Self {
 
                     let ci = zrpc::ComponentState{
                         uuid : id,
@@ -623,7 +624,7 @@ impl<'a> ZServiceGenerator<'a> {
             {
                 type Resp = #response_ident;
 
-                fn instance_uuid(&self) -> uuid::Uuid {
+                fn instance_uuid(&self) -> zenoh::prelude::ZenohId {
                     self.instance_id
                 }
 
@@ -1032,7 +1033,7 @@ impl<'a> ZServiceGenerator<'a> {
             #[derive(Clone, Debug)]
             #vis struct #client_ident<C = zrpc::ZClientChannel<#request_ident, #response_ident>>{
                 ch : C,
-                server_uuid : Uuid,
+                server_uuid : zenoh::prelude::ZenohId,
             }
         }
     }
@@ -1050,7 +1051,7 @@ impl<'a> ZServiceGenerator<'a> {
             impl #client_ident {
                 #vis fn new(
                     z : async_std::sync::Arc<zenoh::Session>,
-                    instance_id : uuid::Uuid
+                    instance_id : zenoh::prelude::ZenohId
                 ) -> #client_ident {
                         let new_client = zrpc::ZClientChannel::new(z, format!("{}",#eval_path), Some(instance_id));
                         #client_ident{
@@ -1060,13 +1061,13 @@ impl<'a> ZServiceGenerator<'a> {
 
                     }
 
-                #vis fn get_server_uuid(&self) -> Uuid {
+                #vis fn get_server_uuid(&self) -> zenoh::prelude::ZenohId {
                     self.server_uuid
                 }
 
                 #vis fn find_servers(
                     z : async_std::sync::Arc<zenoh::Session>
-                ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
+                ) -> impl std::future::Future<Output = ZRPCResult<Vec<zenoh::prelude::ZenohId>>> + 'static
                 {
                     async move {
                         use zenoh::prelude::r#async::*;
@@ -1149,7 +1150,7 @@ impl<'a> ZServiceGenerator<'a> {
 
                 #vis fn find_local_servers(
                     z : async_std::sync::Arc<zenoh::Session>
-                ) -> impl std::future::Future<Output = ZRPCResult<Vec<uuid::Uuid>>> + 'static
+                ) -> impl std::future::Future<Output = ZRPCResult<Vec<zenoh::prelude::ZenohId>>> + 'static
                 {
                     async move {
                         use zenoh::prelude::r#async::*;
@@ -1193,7 +1194,7 @@ impl<'a> ZServiceGenerator<'a> {
                                     let ri = zrpc::serialize::deserialize_router_info(
                                         &sample.value.payload.contiguous(),
                                     )?;
-                                    let r: Vec<Uuid> = servers
+                                    let r: Vec<zenoh::prelude::ZenohId> = servers
                                         .into_iter()
                                         .filter_map(|ci| {
                                             let pid = String::from(&ci.peerid).to_uppercase();

@@ -16,7 +16,6 @@
 
 use async_std::sync::{Arc, Mutex};
 use std::str;
-use uuid::Uuid;
 
 //importing the macros
 use zenoh::prelude::r#async::*;
@@ -49,9 +48,9 @@ impl Hello for HelloZService {
     }
 }
 
-fn configure_zenoh(id: Uuid, listen: String, connect: String) -> zenoh::config::Config {
+fn configure_zenoh(id: ZenohId, listen: String, connect: String) -> zenoh::config::Config {
     let mut config = zenoh::config::Config::default();
-    config.set_id(id.into()).unwrap();
+    config.set_id(id).unwrap();
     config
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
@@ -62,8 +61,7 @@ fn configure_zenoh(id: Uuid, listen: String, connect: String) -> zenoh::config::
     config
 }
 
-async fn wait_for_peer(session: &zenoh::Session, id: Uuid) {
-    let id = ZenohId::from(id);
+async fn wait_for_peer(session: &zenoh::Session, id: ZenohId) {
     while !session.info().peers_zid().res().await.any(|e| e == id) {
         async_std::task::sleep(std::time::Duration::from_secs(1)).await
     }
@@ -72,8 +70,8 @@ async fn wait_for_peer(session: &zenoh::Session, id: Uuid) {
 #[test]
 fn service_discovery() {
     async_std::task::block_on(async {
-        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
-        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
 
         let server_config = configure_zenoh(
             server_zid,
@@ -123,8 +121,8 @@ fn service_discovery() {
 #[test]
 fn service_call() {
     async_std::task::block_on(async {
-        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000003").unwrap();
-        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000004").unwrap();
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
 
         let server_config = configure_zenoh(
             server_zid,
@@ -189,8 +187,8 @@ fn service_call() {
 #[test]
 fn service_unavailable() {
     async_std::task::block_on(async {
-        let server_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000005").unwrap();
-        let client_zid = Uuid::parse_str("00000000-0000-0000-0000-000000000006").unwrap();
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
 
         let server_config = configure_zenoh(
             server_zid,
@@ -215,7 +213,7 @@ fn service_unavailable() {
         async_std::task::sleep(std::time::Duration::from_secs(1)).await;
 
         let servers = HelloClient::find_servers(client_session).await.unwrap();
-        let empty: Vec<Uuid> = vec![];
+        let empty: Vec<ZenohId> = vec![];
         assert_eq!(empty, servers);
     });
 }

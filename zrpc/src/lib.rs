@@ -24,6 +24,7 @@ pub use types::*;
 pub mod serialize;
 pub mod zrpcresult;
 
+use zenoh::prelude::ZenohId;
 use zrpcresult::ZRPCResult;
 
 /// Trait to be implemented by services
@@ -31,7 +32,7 @@ pub trait ZServe<Req>: Sized + Clone {
     /// Type of the response
     type Resp;
 
-    fn instance_uuid(&self) -> uuid::Uuid;
+    fn instance_uuid(&self) -> ZenohId;
 
     /// Connects to Zenoh, do nothing in this case, state is HALTED
     #[allow(clippy::type_complexity)]

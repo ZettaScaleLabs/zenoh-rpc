@@ -19,7 +19,6 @@ use flume::Receiver;
 use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
-use uuid::Uuid;
 use zenoh::prelude::r#async::*;
 use zenoh::query::*;
 use zenoh::Session;
@@ -31,7 +30,7 @@ use crate::zrpcresult::{ZRPCError, ZRPCResult};
 pub struct ZClientChannel<Req, Resp> {
     z: Arc<Session>,
     path: String,
-    server_uuid: Option<Uuid>,
+    server_uuid: Option<ZenohId>,
     phantom_resp: PhantomData<Resp>,
     phantom_req: PhantomData<Req>,
 }
@@ -44,7 +43,7 @@ where
     pub fn new(
         z: Arc<Session>,
         path: String,
-        server_uuid: Option<Uuid>,
+        server_uuid: Option<ZenohId>,
     ) -> ZClientChannel<Req, Resp> {
         ZClientChannel {
             z,
