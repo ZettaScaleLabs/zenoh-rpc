@@ -23,7 +23,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.7.0-dev"
+version = "0.7.0-alpha.1"
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
 categories = ["network-programming"]
 description = "Framework for decentralized and distributed microservices over Zenoh."
