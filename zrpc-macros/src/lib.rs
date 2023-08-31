@@ -287,7 +287,7 @@ pub fn zservice(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// Modifies the method in a similar way to what async_trait does
 /// This impl:
 ///
-/// #[zserver]
+/// #[macro@zserver]
 /// impl Hello for Server {
 ///     async pub fn hello(&self, param : String) -> String {
 ///         format!("Hello {} from {}", param, self)
