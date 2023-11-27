@@ -16,12 +16,16 @@
 pub use futures::stream::{AbortHandle, AbortRegistration, Abortable, Aborted};
 
 pub mod zchannel;
+pub mod zrchannel;
 pub use zchannel::ZClientChannel;
 
 pub mod types;
 pub use types::*;
 
+pub mod request;
+pub mod response;
 pub mod serialize;
+pub mod status;
 pub mod zrpcresult;
 
 use zenoh::prelude::ZenohId;
