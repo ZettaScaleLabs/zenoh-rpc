@@ -8,6 +8,16 @@ pub struct Status {
     metadata: HashMap<String, String>,
 }
 
+impl Status {
+    pub fn new(code: Code, message: &str) -> Self {
+        Self {
+            code,
+            message: message.to_owned(),
+            metadata: HashMap::new(),
+        }
+    }
+}
+
 /// Zenoh-RPC status codes
 /// Based on HTTP ones: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]

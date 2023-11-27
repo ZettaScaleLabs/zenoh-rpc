@@ -27,6 +27,7 @@ pub mod response;
 pub mod serialize;
 pub mod status;
 pub mod zrpcresult;
+pub mod result;
 
 use zenoh::prelude::ZenohId;
 use zrpcresult::ZRPCResult;

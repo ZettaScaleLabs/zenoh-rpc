@@ -23,8 +23,10 @@ use zenoh::query::*;
 use zenoh::Session;
 
 use crate::request::Request;
-use crate::response::Response;
+use crate::result::RPCResult;
 use crate::serialize;
+use crate::status::Code;
+use crate::status::Status;
 use crate::zrpcresult::{ZRPCError, ZRPCResult};
 
 #[derive(Clone)]
@@ -71,14 +73,14 @@ impl ZRClientChannel {
 
     /// This function calls the eval on the server and deserialized the result
     /// if the value is not deserializable or the eval returns none it returns an IOError
-    pub async fn call_fun<T, U>(&self, request: Request<T>, method: &str) -> ZRPCResult<Response<U>>
+    pub async fn call_fun<T, U>(&self, request: Request<T>, method: &str) -> RPCResult<U>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
         U: Serialize + Clone + std::fmt::Debug,
         for<'de3> U: Deserialize<'de3>,
     {
-        let data_receiver = self.send(&request, method).await?;
+        let data_receiver = self.send(&request, method).await.unwrap();
         //takes only one, eval goes to only one
         let reply = data_receiver.recv_async().await;
         log::trace!("Response from zenoh is {:?}", reply);
@@ -88,22 +90,26 @@ impl ZRClientChannel {
                     Encoding::APP_OCTET_STREAM => {
                         let raw_data = sample.value.payload.contiguous().to_vec();
                         log::trace!("Size of response is {}", raw_data.len());
-                        Ok(serialize::deserialize_response(&raw_data)?)
+                        match serialize::deserialize_response(&raw_data) {
+                            Ok(r) => r,
+                            Err(e) => RPCResult::Err(Status::new(Code::InternalError, &format!("Cannot deserialize: {e:?}")))
+                        }
+                        
                     }
-                    _ => Err(ZRPCError::ZenohError(
-                        "Response data is expected to be APP_OCTET_STREAM in Zenoh!!".to_string(),
+                    _ => RPCResult::Err(Status::new(Code::InternalError,
+                        "Response data is expected to be APP_OCTET_STREAM in Zenoh!!",
                     )),
                 },
                 Err(e) => {
                     log::error!("Unable to get sample from {e:?}");
-                    Err(ZRPCError::ZenohError(format!(
+                    RPCResult::Err(Status::new(Code::InternalError, &format!(
                         "Unable to get sample from {e:?}"
                     )))
                 }
             }
         } else {
             log::error!("No data from server");
-            Err(ZRPCError::ZenohError(format!(
+            RPCResult::Err(Status::new(Code::InternalError, &format!(
                 "No data from call_fun for Request {:?}",
                 request
             )))

@@ -23,6 +23,7 @@ use std::prelude::v1::*;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
 use zenoh::prelude::ZenohId;
+use zrpc::result::RPCResult;
 
 use std::str;
 use std::time::Duration;
@@ -34,7 +35,7 @@ use zrpc::ZServe;
 
 use zrpc::request::Request;
 use zrpc::response::Response;
-use zrpc::status::Status;
+use zrpc::status::{Status, Code};
 
 pub trait Hello: Clone {
     fn hello(
@@ -53,6 +54,17 @@ pub trait Hello: Clone {
     ) -> ::core::pin::Pin<
         Box<
             dyn ::core::future::Future<Output = Result<Response<AddResponse>, Status>>
+                + core::marker::Send
+                + '_,
+        >,
+    >;
+
+    fn sub(
+        &mut self,
+        request: Request<SubRequest>,
+    ) -> ::core::pin::Pin<
+        Box<
+            dyn ::core::future::Future<Output = Result<Response<SubResponse>, Status>>
                 + core::marker::Send
                 + '_,
         >,
@@ -331,7 +343,7 @@ where
                                     zrpc::serialize::deserialize_request::<Request<HelloRequest>>(
                                         &value.payload.contiguous(),
                                     )?;
-                                let resp = ser.hello(req).await.unwrap();
+                                let resp : RPCResult<HelloResponse> = ser.hello(req).await.into();
                                 zrpc::serialize::serialize_response(&resp)
                             }
                             "add" => {
@@ -339,10 +351,17 @@ where
                                     zrpc::serialize::deserialize_request::<Request<AddRequest>>(
                                         &value.payload.contiguous(),
                                     )?;
-                                let resp = ser.add(req).await.unwrap();
+                                let resp : RPCResult<AddResponse> = ser.add(req).await.into();
                                 zrpc::serialize::serialize_response(&resp)
                             }
-
+                            "sub" => {
+                                let req =
+                                    zrpc::serialize::deserialize_request::<Request<SubRequest>>(
+                                        &value.payload.contiguous(),
+                                    )?;
+                                let resp : RPCResult<SubResponse> = ser.sub(req).await.into();
+                                zrpc::serialize::serialize_response(&resp)
+                            }
                             _ => {
                                 panic!("Unknown method: {method}");
                             }
@@ -488,6 +507,10 @@ pub struct HelloRequest {
 pub struct AddRequest {
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubRequest {
+}
+
 /// The response sent over the wire from the server to the client.
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -497,6 +520,11 @@ pub struct HelloResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddResponse {
+    pub value: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubResponse {
     pub value: u64,
 }
 
@@ -668,16 +696,13 @@ impl HelloClient {
     pub fn hello(
         &self,
         request: Request<HelloRequest>,
-    ) -> impl std::future::Future<Output = ZRPCResult<Response<HelloResponse>>> + '_ {
+    ) -> impl std::future::Future<Output = Result<Response<HelloResponse>, Status>> + '_ {
         async move {
             let resp = self.ch.call_fun(request, "hello");
             let dur = std::time::Duration::from_secs(60u16 as u64);
             match async_std::future::timeout(dur, resp).await {
-                Ok(r) => match r {
-                    Ok(zr) => Ok(zr),
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(ZRPCError::TimedOut),
+                Ok(r) => r.into(),
+                Err(e) => Err(Status::new(Code::Timeout, "")),
             }
         }
     }
@@ -685,16 +710,29 @@ impl HelloClient {
     pub fn add(
         &self,
         request: Request<AddRequest>,
-    ) -> impl std::future::Future<Output = ZRPCResult<Response<AddResponse>>> + '_ {
+    ) -> impl std::future::Future<Output = Result<Response<AddResponse>, Status>> + '_ {
         async move {
             let resp = self.ch.call_fun(request, "add");
             let dur = std::time::Duration::from_secs(60u16 as u64);
             match async_std::future::timeout(dur, resp).await {
-                Ok(r) => match r {
-                    Ok(zr) => Ok(zr),
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(ZRPCError::TimedOut),
+                Ok(r) =>r.into(),
+                Err(e) => Err(Status::new(Code::Timeout, "")),
+            }
+        }
+    }
+
+
+    #[allow(unused, clippy::manual_async_fn)]
+    pub fn sub(
+        &self,
+        request: Request<SubRequest>,
+    ) -> impl std::future::Future<Output = Result<Response<SubResponse>, Status>> + '_ {
+        async move {
+            let resp = self.ch.call_fun(request, "sub");
+            let dur = std::time::Duration::from_secs(60u16 as u64);
+            match async_std::future::timeout(dur, resp).await {
+                Ok(r) =>r.into(),
+                Err(e) => Err(Status::new(Code::Timeout, "")),
             }
         }
     }
@@ -755,6 +793,25 @@ impl Hello for HelloZService {
         }
         Box::pin(__add(self, request))
     }
+
+    fn sub(
+        &mut self,
+        request: Request<SubRequest>,
+    ) -> ::core::pin::Pin<
+        Box<
+            dyn ::core::future::Future<Output = Result<Response<SubResponse>, Status>>
+                + core::marker::Send
+                + '_,
+        >,
+    > {
+        async fn __sub(
+            mut _self: &HelloZService,
+            _request: Request<SubRequest>,
+        ) -> Result<Response<SubResponse>, Status> {
+            Err(Status::new(Code::NotImplemented, "Not yet!"))
+        }
+        Box::pin(__sub(self, request))
+    }
 }
 
 #[async_std::main]
@@ -810,6 +867,9 @@ async fn main() {
         println!("Res is: {:?}", res);
 
         let res = client.add(Request::new(AddRequest { })).await;
+        println!("Res is: {:?}", res);
+
+        let res = client.sub(Request::new(SubRequest { })).await;
         println!("Res is: {:?}", res);
 
         server.stop(s).await.unwrap();
