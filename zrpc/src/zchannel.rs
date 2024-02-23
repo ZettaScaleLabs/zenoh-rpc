@@ -19,6 +19,7 @@ use flume::Receiver;
 use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
+use zenoh::encoding::iana::IanaEncoding;
 use zenoh::prelude::r#async::*;
 use zenoh::query::*;
 use zenoh::Session;
@@ -81,7 +82,7 @@ where
         if let Ok(reply) = reply {
             match reply.sample {
                 Ok(sample) => match sample.value.encoding {
-                    Encoding::APP_OCTET_STREAM => {
+                    IanaEncoding::APPLICATION_OCTET_STREAM => {
                         let raw_data = sample.value.payload.contiguous().to_vec();
                         log::trace!("Size of response is {}", raw_data.len());
                         Ok(serialize::deserialize_response(&raw_data)?)
@@ -127,7 +128,7 @@ where
         if let Ok(reply) = reply {
             match reply.sample {
                 Ok(sample) => match sample.value.encoding {
-                    Encoding::APP_OCTET_STREAM => {
+                    IanaEncoding::APPLICATION_OCTET_STREAM => {
                         let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
                             &sample.value.payload.contiguous(),
                         )?;

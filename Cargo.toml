@@ -14,6 +14,7 @@
 [workspace]
 
 members = [
+  "zenoh-typed",
   "zrpc",
   "zrpc-macros",
 ]
@@ -40,3 +41,12 @@ lto="fat"
 codegen-units=1
 opt-level=3
 panic="abort"
+
+
+[workspace.dependencies]
+zenoh =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev",  default-features = false}
+zenoh-util =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev" }
+zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev" }
+zenoh-core =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev" }
+zenoh-macros = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev" }
+zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "encoding_encoder", version = "0.11.0-dev" }
