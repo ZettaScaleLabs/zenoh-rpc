@@ -11,12 +11,9 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
-use async_std::task::sleep;
+
 use clap::Parser;
-use futures::prelude::*;
-use futures::select;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use zenoh::config::Config;
 use zenoh::prelude::r#async::*;
 use zenoh_typed::prelude::*;
@@ -53,10 +50,8 @@ async fn main() {
     .unwrap();
 
     println!("Enter 'q' to quit...");
-    let mut stdin = async_std::io::stdin();
-    let mut input = [0_u8];
     while let Ok(data) = subscriber.recv_async().await {
-        println!(">> [Subscriber] Received {data:?}",);
+        println!(">> [Subscriber] Received {} - {}", data.id, data.name);
     }
 }
 

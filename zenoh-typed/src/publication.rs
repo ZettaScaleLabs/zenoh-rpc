@@ -188,9 +188,9 @@ impl<'a, 'b, T, C> TypePublisherBuilder<'a, 'b, T, C> {
 // }
 
 pub struct TypedPublisher<'a, T, C> {
-    inner: Publisher<'a>,
+    _inner: Publisher<'a>,
     phantom_data: PhantomData<T>,
-    codec: C,
+    _codec: C,
 }
 
 // impl<'a, T, C> TypedPublisher<'a, T, C>

@@ -31,18 +31,17 @@ async fn main() {
     // Initiate logging
     env_logger::init();
 
-    let (config, key_expr, value, attachment) = parse_args();
+    let (config, key_expr, value, _attachment) = parse_args();
 
     println!("Opening session...");
     let session = zenoh::open(config).res().await.unwrap();
 
     println!("Declaring Publisher on '{key_expr}'...");
-    let publisher = session.declare_publisher(&key_expr).res().await.unwrap();
+    // let publisher = session.declare_publisher(&key_expr).res().await.unwrap();
 
     for idx in 0..u32::MAX {
         sleep(Duration::from_secs(1)).await;
-        let buf = format!("[{idx:4}] {value}");
-        let value: MyData = MyData { name: buf, id: 123 };
+        let value: MyData = MyData { name: value.clone(), id: idx as u64 };
         println!("Putting Data ('{key_expr}': '{value:?}')...");
 
         TypedSession::<CBOREncoder, CBOREncoder>::put(&session, &key_expr, &value)
@@ -67,17 +66,6 @@ struct Args {
     attach: Option<String>,
     #[command(flatten)]
     common: CommonArgs,
-}
-
-fn split_once(s: &str, c: char) -> (&[u8], &[u8]) {
-    let s_bytes = s.as_bytes();
-    match s.find(c) {
-        Some(index) => {
-            let (l, r) = s_bytes.split_at(index);
-            (l, &r[1..])
-        }
-        None => (s_bytes, &[]),
-    }
 }
 
 fn parse_args() -> (Config, KeyExpr<'static>, String, Option<String>) {
