@@ -153,7 +153,7 @@ where
                         let data = zrpc::serialize::serialize_state(&*ci)?;
                         drop(ci);
                         let value = zenoh::prelude::Value::new(data.into())
-                            .encoding(zenoh::prelude::Encoding::APP_OCTET_STREAM);
+                            .encoding(zenoh::prelude::Encoding::APPLICATION_OCTET_STREAM);
 
                         let sample = zenoh::prelude::Sample::new(kexpr.clone(), value);
                         query.reply(Ok(sample)).res().await.map_err(|e| {
@@ -303,7 +303,7 @@ where
                 match query.value() {
                     Some(value) => {
                         let req = zrpc::serialize::deserialize_request::<HelloRequest>(
-                            &value.payload.contiguous(),
+                            &value.payload.into(),
                         )?;
 
                         let mut ser = _self.server.clone();
@@ -317,8 +317,8 @@ where
                                 zrpc::serialize::serialize_response(&resp)
                             }
                         }?;
-                        let value =
-                            Value::new(encoded_resp.into()).encoding(Encoding::APP_OCTET_STREAM);
+                        let value = Value::new(encoded_resp.into())
+                            .encoding(Encoding::APPLICATION_OCTET_STREAM);
                         let sample = Sample::new(kexpr.clone(), value);
 
                         query.reply(Ok(sample)).res().await.map_err(|e| {
@@ -497,7 +497,7 @@ impl HelloClient {
             while let Ok(d) = replies.recv_async().await {
                 match d.sample {
                     Ok(sample) => match sample.value.encoding {
-                        Encoding::APP_OCTET_STREAM => {
+                        Encoding::APPLICATION_OCTET_STREAM => {
                             let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
                                 &sample.value.payload.contiguous(),
                             )?;
@@ -534,7 +534,7 @@ impl HelloClient {
             while let Ok(d) = replies.recv_async().await {
                 match d.sample {
                     Ok(sample) => match sample.value.encoding {
-                        Encoding::APP_OCTET_STREAM => {
+                        Encoding::APPLICATION_OCTET_STREAM => {
                             let ca = zrpc::serialize::deserialize_state::<zrpc::ComponentState>(
                                 &sample.value.payload.contiguous(),
                             )?;
@@ -590,7 +590,7 @@ impl HelloClient {
             let router_data = rdata.remove(0);
             match router_data.sample {
                 Ok(sample) => match sample.value.encoding {
-                    Encoding::APP_JSON => {
+                    Encoding::APPLICATION_JSON => {
                         let ri = zrpc::serialize::deserialize_router_info(
                             &sample.value.payload.contiguous(),
                         )?;

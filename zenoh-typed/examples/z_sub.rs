@@ -16,8 +16,8 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use zenoh::config::Config;
 use zenoh::prelude::r#async::*;
+use zenoh::subscriber::Subscriber;
 use zenoh_typed::prelude::*;
-use zenoh_typed::session::CBOREncoder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct MyData {
@@ -39,15 +39,15 @@ async fn main() {
 
     println!("Opening session...");
     let session = zenoh::open(config).res().await.unwrap();
+    let session = SerdeSession::new(session, CBOR);
 
     println!("Declaring Subscriber on '{}'...", &key_expr);
 
-    let subscriber = TypedSession::<CBOREncoder, CBOREncoder>::declare_subscriber::<_, MyData>(
-        &session, &key_expr,
-    )
-    .res()
-    .await
-    .unwrap();
+    let subscriber = session
+        .declare_subscriber::<_, MyData>(&key_expr)
+        .res()
+        .await
+        .unwrap();
 
     println!("Enter 'q' to quit...");
     while let Ok(data) = subscriber.recv_async().await {

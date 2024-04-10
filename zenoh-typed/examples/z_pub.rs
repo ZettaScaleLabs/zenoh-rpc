@@ -16,9 +16,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use zenoh::config::Config;
+// use zenoh::payload::Serialize;
 use zenoh::prelude::r#async::*;
 use zenoh_typed::prelude::*;
-use zenoh_typed::session::CBOREncoder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct MyData {
@@ -35,23 +35,33 @@ async fn main() {
 
     println!("Opening session...");
     let session = zenoh::open(config).res().await.unwrap();
+    let session = SerdeSession::new(session, CBOR);
 
     println!("Declaring Publisher on '{key_expr}'...");
-    // let publisher = session.declare_publisher(&key_expr).res().await.unwrap();
+    let publisher = session
+        .declare_publisher::<_, MyData>(key_expr)
+        .res()
+        .await
+        .unwrap();
 
     for idx in 0..u32::MAX {
         sleep(Duration::from_secs(1)).await;
-        let value: MyData = MyData { name: value.clone(), id: idx as u64 };
-        println!("Putting Data ('{key_expr}': '{value:?}')...");
+        let value: MyData = MyData {
+            name: value.clone(),
+            id: idx as u64,
+        };
+        println!("Putting Data ('{value:?}')...");
 
-        TypedSession::<CBOREncoder, CBOREncoder>::put(&session, &key_expr, &value)
-            .res()
-            .await
-            .unwrap();
+        publisher.put(value).res().await.unwrap();
+
+        // TypedSession::<CBOREncoder, CBOREncoder>::put(&session, &key_expr, &value)
+        //     .res()
+        //     .await
+        //     .unwrap();
     }
 }
 
-#[derive(clap::Parser, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Parser, Clone, PartialEq, Eq, Hash, Debug)]
 struct Args {
     #[arg(short, long, default_value = "demo/example/zenoh-rs-pub")]
     /// The key expression to write to.

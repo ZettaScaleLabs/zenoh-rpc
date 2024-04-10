@@ -14,41 +14,41 @@
 use std::{future::Ready, marker::PhantomData};
 
 use zenoh::{
-    handlers::IntoCallbackReceiverPair,
+    handlers::IntoHandler,
     sample::Sample,
-    subscriber::{PushMode, Subscriber, SubscriberBuilder},
+    subscriber::{Subscriber, SubscriberBuilder},
     Result as ZResult,
 };
 use zenoh_core::{AsyncResolve, Resolvable, SyncResolve};
 
 #[derive(Debug)]
-pub struct TypedSubscriberBuilder<'a, 'b, Mode, Handler, T> {
-    pub inner: SubscriberBuilder<'a, 'b, Mode, Handler>,
+pub struct TypedSubscriberBuilder<'a, 'b, Handler, T> {
+    pub inner: SubscriberBuilder<'a, 'b, Handler>,
     pub phantom_data: PhantomData<T>,
 }
 
-impl<'a, T, Handler> Resolvable for TypedSubscriberBuilder<'a, '_, PushMode, Handler, T>
+impl<'a, T, Handler> Resolvable for TypedSubscriberBuilder<'a, '_, Handler, T>
 where
-    Handler: IntoCallbackReceiverPair<'static, Sample> + Send,
-    Handler::Receiver: Send,
+    Handler: IntoHandler<'static, Sample> + Send,
+    Handler::Handler: Send,
 {
-    type To = ZResult<Subscriber<'a, Handler::Receiver>>;
+    type To = ZResult<Subscriber<'a, Handler::Handler>>;
 }
 
-impl<'a, Handler, T> SyncResolve for TypedSubscriberBuilder<'a, '_, PushMode, Handler, T>
+impl<'a, Handler, T> SyncResolve for TypedSubscriberBuilder<'a, '_, Handler, T>
 where
-    Handler: IntoCallbackReceiverPair<'static, Sample> + Send,
-    Handler::Receiver: Send,
+    Handler: IntoHandler<'static, Sample> + Send,
+    Handler::Handler: Send,
 {
     fn res_sync(self) -> <Self as Resolvable>::To {
         self.inner.res_sync()
     }
 }
 
-impl<'a, Handler, T> AsyncResolve for TypedSubscriberBuilder<'a, '_, PushMode, Handler, T>
+impl<'a, Handler, T> AsyncResolve for TypedSubscriberBuilder<'a, '_, Handler, T>
 where
-    Handler: IntoCallbackReceiverPair<'static, Sample> + Send,
-    Handler::Receiver: Send,
+    Handler: IntoHandler<'static, Sample> + Send,
+    Handler::Handler: Send,
 {
     type Future = Ready<Self::To>;
 

@@ -12,161 +12,121 @@
 *********************************************************************************/
 
 use crate::handlers::Typer;
+use crate::publication::TypePublisherBuilder;
 use crate::subscription::TypedSubscriberBuilder;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::io::Read;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use zenoh::publication::SessionPutBuilder;
 
-use zenoh::encoding::iana::IanaEncoding;
-use zenoh::encoding::{Decoder, Encoder};
+use zenoh::payload::{self, Deserialize as ZDeserialize, Serialize as ZSerialize};
+use zenoh::prelude::Encoding;
 
 use zenoh::handlers::DefaultHandler;
 use zenoh::prelude::r#async::*;
-use zenoh::publication::PutBuilder;
-use zenoh::subscriber::{PushMode, SubscriberBuilder};
+// use zenoh::publication::PutBuilder;
+// use zenoh::subscriber::{PushMode, SubscriberBuilder};
 use zenoh::Session;
 use zenoh_core::{bail, zerror};
-use zenoh_protocol::network::declare::Mode;
 
-pub struct CBOREncoder;
+#[derive(Clone)]
+pub struct CBOR;
 
-impl<T> Encoder<T> for CBOREncoder
+impl<T> ZSerialize<T> for CBOR
 where
     T: Serialize,
 {
-    fn encode(t: T) -> Value {
-        let data = serde_cbor::to_vec(&t).expect("Unable to serialize");
-        Value::new(data.into()).encoding(IanaEncoding::APPLICATION_CBOR)
+    type Output = Payload;
+
+    fn serialize(self, t: T) -> Self::Output {
+        let data = serde_cbor::to_vec(&t).unwrap();
+        Payload::new(data)
     }
 }
 
-impl<T> Decoder<T> for CBOREncoder
+impl<'a, T> ZDeserialize<'a, T> for CBOR
 where
     T: DeserializeOwned,
 {
-    fn decode(v: &Value) -> zenoh::Result<T> {
-        if v.encoding != IanaEncoding::APPLICATION_CBOR {
-            bail!(
-                "Cannot decode! expecting {:?} found {:?}",
-                IanaEncoding::APPLICATION_CBOR,
-                v.encoding
-            );
-        }
+    type Error = serde_cbor::Error;
 
-        let data = serde_cbor::from_slice(&v.payload.contiguous()).expect("Cannot deserialize!");
+    fn deserialize(self, v: &'a Payload) -> Result<T, Self::Error> {
+        // let mut buff = vec![];
+        // let read = v.reader().read_to_end(&mut buff);
+        // println!("Read: {read:?}");
+        let data = serde_cbor::from_reader(v.reader())?;
         Ok(data)
     }
 }
 
-pub trait TypedSession<D, E> {
-    // type MyEncode = E;
-    // type MyDecoder;
-
-    fn put<'a, 'b: 'a, TryIntoKeyExpr, T>(
-        &'a self,
-        key_expr: TryIntoKeyExpr,
-        value: T,
-    ) -> PutBuilder<'a, 'b>
-    where
-        TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-        <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-        E: Encoder<T>;
-
-    fn declare_subscriber<'a, 'b: 'a, TryIntoKeyExpr, T>(
-        &'a self,
-        key_expr: TryIntoKeyExpr,
-    ) -> TypedSubscriberBuilder<'a, 'b, PushMode, Typer<T, D, DefaultHandler>, T>
-    where
-        TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-        <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-        D: Decoder<T>,
-        T: Send + Sync + 'static;
-
-    // fn declare_publisher<'a, 'b: 'a, TryIntoKeyExpr, Codec, T>(
-    //     &'a self,
-    //     key_expr: TryIntoKeyExpr,
-    //     codec: Codec
-    // ) -> TypePublisherBuilder<'a, 'b, T, Codec>
-    // where
-    //     TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-    //     <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-    //     Codec: WCodec<T, Self::TypedWriter>;
-
-    // fn declare_publisher<'a, 'b, TryIntoKeyExpr, Serializable>(
-    //     &'a self,
-    //     key_expr: TryIntoKeyExpr,
-    // ) -> TypePublisherBuilder<'a, 'b, Serializable>
-    // where
-    //     TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-    //     <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-    //     Serializable: Serialize;
+#[derive(Clone)]
+pub struct SerdeSession<S>
+where
+    S: Send + Sync + Clone,
+{
+    session: Arc<Session>,
+    serde: S,
 }
 
-impl<E, D> TypedSession<D, E> for Session {
-    fn put<'a, 'b: 'a, TryIntoKeyExpr, T>(
+impl<'a, S: Send + Sync + Clone> SerdeSession<S> {
+    pub fn new(session: Session, serde: S) -> Self {
+        Self {
+            session: Arc::new(session),
+            serde,
+        }
+    }
+
+    pub fn put<'b: 'a, TryIntoKeyExpr, T>(
         &'a self,
         key_expr: TryIntoKeyExpr,
         value: T,
-    ) -> PutBuilder<'a, 'b>
+    ) -> SessionPutBuilder<'a, 'b>
     where
+        S: ZSerialize<T, Output = Payload>,
         TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
         <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-        E: Encoder<T>,
     {
-        let raw_value = E::encode(value);
-        self.put(key_expr, raw_value)
+        let payload = self.serde.clone().serialize(value);
+        self.session
+            .put(key_expr, payload)
+            .encoding(Encoding::APPLICATION_CBOR)
     }
 
-    fn declare_subscriber<'a, 'b: 'a, TryIntoKeyExpr, T>(
+    pub fn declare_publisher<'b: 'static, TryIntoKeyExpr, T>(
         &'a self,
         key_expr: TryIntoKeyExpr,
-    ) -> TypedSubscriberBuilder<'a, 'b, PushMode, Typer<T, D, DefaultHandler>, T>
+    ) -> TypePublisherBuilder<'a, 'b, T, S>
     where
         TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
         <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-        D: Decoder<T>,
-        T: Send + Sync + 'static,
+        S: ZSerialize<T, Output = Payload>,
     {
-        let handler = Typer(PhantomData, PhantomData, DefaultHandler);
-        let inner = zenoh::SessionDeclarations::declare_subscriber(self, key_expr).with(handler);
+        TypePublisherBuilder {
+            inner: zenoh::SessionDeclarations::declare_publisher(&self.session, key_expr),
+            phantom_data: PhantomData,
+            serde: self.serde.clone(),
+        }
+    }
+
+    pub fn declare_subscriber<'b: 'a, TryIntoKeyExpr, T>(
+        &'a self,
+        key_expr: TryIntoKeyExpr,
+    ) -> TypedSubscriberBuilder<'a, 'b, Typer<T, S, DefaultHandler>, T>
+    where
+        TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
+        <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
+        S: ZDeserialize<'a, T>,
+        T: Send + Sync + 'static,
+        Typer<T, S, DefaultHandler>: IntoHandler<'static, Sample>,
+    {
+        let handler = Typer(PhantomData, self.serde.clone(), DefaultHandler);
+        let inner =
+            zenoh::SessionDeclarations::declare_subscriber(&self.session, key_expr).with(handler);
         TypedSubscriberBuilder {
             inner,
             phantom_data: PhantomData,
         }
     }
-
-    // fn declare_subscriber<'a, 'b: 'a, TryIntoKeyExpr, T>(
-    //     &'a self,
-    //     key_expr: TryIntoKeyExpr,
-    // ) -> TypedSubscriberBuilder<'a, 'b, PushMode, DefaultTypedHandler, T>
-    // where
-    //     TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-    //     <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-    //     T: Decoder<T>,
-    // {
-    //     todo!()
-    // }
-
-    // fn declare_publisher<'a, 'b: 'a, TryIntoKeyExpr, Codec, T>(
-    //     &'a self,
-    //     key_expr: TryIntoKeyExpr,
-    //     codec: Codec
-    // ) -> TypePublisherBuilder<'a, 'b, T, Codec>ss
-    // where
-    //     TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-    //     <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-    //     Codec: WCodec<T, Self::TypedWriter> {
-    //         todo!()
-    //     }
-
-    // fn declare_publisher<'a, 'b, TryIntoKeyExpr, Serializable>(
-    //     &'a self,
-    //     key_expr: TryIntoKeyExpr,
-    // ) -> TypePublisherBuilder<'a, 'b, Serializable>
-    // where
-    //     TryIntoKeyExpr: TryInto<KeyExpr<'b>>,
-    //     <TryIntoKeyExpr as TryInto<KeyExpr<'b>>>::Error: Into<zenoh::Error>,
-    //     Serializable: Serialize {
-    //         todo!()
-    //     }
 }

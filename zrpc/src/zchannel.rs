@@ -19,8 +19,8 @@ use flume::Receiver;
 use log::trace;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
-use zenoh::encoding::iana::IanaEncoding;
 use zenoh::prelude::r#async::*;
+use zenoh::prelude::Encoding;
 use zenoh::query::*;
 use zenoh::Session;
 
@@ -66,7 +66,7 @@ where
         Ok(self
             .z
             .get(&selector)
-            .with_value(req)
+            .value(req)
             .target(QueryTarget::All)
             .res()
             .await?)
@@ -81,9 +81,9 @@ where
         log::trace!("Response from zenoh is {:?}", reply);
         if let Ok(reply) = reply {
             match reply.sample {
-                Ok(sample) => match sample.value.encoding {
-                    IanaEncoding::APPLICATION_OCTET_STREAM => {
-                        let raw_data = sample.value.payload.contiguous().to_vec();
+                Ok(sample) => match sample.encoding() {
+                    &Encoding::APPLICATION_OCTET_STREAM => {
+                        let raw_data: Vec<u8> = sample.payload().into();
                         log::trace!("Size of response is {}", raw_data.len());
                         Ok(serialize::deserialize_response(&raw_data)?)
                     }
@@ -127,10 +127,11 @@ where
 
         if let Ok(reply) = reply {
             match reply.sample {
-                Ok(sample) => match sample.value.encoding {
-                    IanaEncoding::APPLICATION_OCTET_STREAM => {
+                Ok(sample) => match sample.encoding() {
+                    &Encoding::APPLICATION_OCTET_STREAM => {
+                        let raw_data: Vec<u8> = sample.payload().into();
                         let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
-                            &sample.value.payload.contiguous(),
+                            &raw_data,
                         )?;
                         if ca.status == crate::types::ComponentStatus::SERVING {
                             return Ok(true);

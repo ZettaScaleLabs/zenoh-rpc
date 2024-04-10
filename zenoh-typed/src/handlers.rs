@@ -14,27 +14,55 @@
 use std::marker::PhantomData;
 
 use zenoh::{
-    encoding::Decoder,
-    handlers::{Callback, Dyn, IntoCallbackReceiverPair},
+    handlers::{Callback, Dyn},
+    payload::Deserialize,
+    prelude::IntoHandler,
     sample::Sample,
-    value::Value,
 };
 
 // Pierre's magic
-pub struct Typer<T: Send + Sync, D, Handler>(pub PhantomData<T>, pub PhantomData<D>, pub Handler);
+pub struct Typer<T, S, Handler>(pub PhantomData<T>, pub S, pub Handler);
 
-impl<'a, T: 'a, D, Handler> IntoCallbackReceiverPair<'a, Sample> for Typer<T, D, Handler>
+impl<'a, T, S, Handler> IntoHandler<'a, Sample> for Typer<T, S, Handler>
 where
-    Handler: IntoCallbackReceiverPair<'a, T>,
-    D: Decoder<T>,
-    T: Send + Sync,
+    Handler: IntoHandler<'a, T>,
+    for<'b> S: Send + Sync + Clone + Deserialize<'b, T> + 'a,
+    T: 'a + Send + Sync,
+    for<'b> <S as zenoh::payload::Deserialize<'b, T>>::Error: std::fmt::Debug,
 {
-    type Receiver = Handler::Receiver;
-    fn into_cb_receiver_pair(self) -> (Callback<'a, Sample>, Self::Receiver) {
-        let (cb, receiver) = self.2.into_cb_receiver_pair();
+    type Handler = Handler::Handler;
+    fn into_handler(self) -> (Callback<'a, Sample>, Self::Handler) {
+        let (cb, receiver) = self.2.into_handler();
         (
-            Dyn::new(move |z| cb(D::decode(&z.value).expect("Unable to decode"))),
+            Dyn::new(
+                move |z: Sample| match self.1.clone().deserialize(z.payload()) {
+                    Ok(d) => cb(d),
+                    Err(e) => log::error!("Cannot deserialize: {e:?}"),
+                },
+            ),
             receiver,
         )
     }
 }
+
+// impl<T, S, Handler> IntoHandler<'static, Sample> for Typer<T, S, Handler>
+// where
+//     Handler: IntoHandler<'static, T>,
+//     for<'b> S: Send + Sync + Clone + Deserialize<'b, T>,
+//     T: Send + Sync + 'static,
+// {
+//     type Handler = Handler::Handler;
+//     fn into_handler(self) -> (Callback<'static, Sample>, Self::Handler) {
+//         let (cb, receiver) = self.2.into_handler();
+//         let de = self.1.clone();
+//         (
+//             Dyn::new(
+//                 move |z: Sample| match de.deserialize(z.payload()) {
+//                     Ok(d) => cb(d),
+//                     Err(_) => (),
+//                 },
+//             ),
+//             receiver,
+//         )
+//     }
+// }

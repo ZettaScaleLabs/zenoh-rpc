@@ -11,13 +11,14 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
+use async_std::task::sleep;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use zenoh::config::Config;
-use zenoh::encoding::Encoder;
+// use zenoh::payload::Serialize;
 use zenoh::prelude::r#async::*;
 use zenoh_typed::prelude::*;
-use zenoh_typed::session::CBOREncoder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct MyData {
@@ -27,42 +28,55 @@ struct MyData {
 
 #[async_std::main]
 async fn main() {
-    // initiate logging
+    // Initiate logging
     env_logger::init();
 
-    let (config, key_expr, value) = parse_args();
-
-    let value = MyData {
-        name: value,
-        id: 123,
-    };
+    let (config, key_expr, value, _attachment) = parse_args();
 
     println!("Opening session...");
     let session = zenoh::open(config).res().await.unwrap();
+    let session = SerdeSession::new(session, CBOR);
 
-    println!("Putting Data ('{key_expr}': '{value:?}')...");
+    println!("Declaring Publisher on '{key_expr}'...");
+    // let publisher = session.declare_publisher(&key_expr).res().await.unwrap();
 
-    TypedSession::<CBOREncoder, CBOREncoder>::put(&session, &key_expr, &value)
-        .res()
-        .await
-        .unwrap();
+    for idx in 0..u32::MAX {
+        sleep(Duration::from_secs(1)).await;
+        let value: MyData = MyData {
+            name: value.clone(),
+            id: idx as u64,
+        };
+        println!("Putting Data ('{key_expr}': '{value:?}')...");
+
+        session.put(&key_expr, value).res().await.unwrap();
+
+        // TypedSession::<CBOREncoder, CBOREncoder>::put(&session, &key_expr, &value)
+        //     .res()
+        //     .await
+        //     .unwrap();
+    }
 }
 
-#[derive(clap::Parser, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Parser, Clone, PartialEq, Eq, Hash, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "demo/example/zenoh-rs-put")]
+    #[arg(short, long, default_value = "demo/example/zenoh-rs-pub")]
     /// The key expression to write to.
     key: KeyExpr<'static>,
-    #[arg(short, long, default_value = "Put from Rust!")]
+    #[arg(short, long, default_value = "Pub from Rust!")]
     /// The value to write.
     value: String,
+    #[arg(short, long)]
+    /// The attachments to add to each put.
+    ///
+    /// The key-value pairs are &-separated, and = serves as the separator between key and value.
+    attach: Option<String>,
     #[command(flatten)]
     common: CommonArgs,
 }
 
-fn parse_args() -> (Config, KeyExpr<'static>, String) {
+fn parse_args() -> (Config, KeyExpr<'static>, String, Option<String>) {
     let args = Args::parse();
-    (args.common.into(), args.key, args.value)
+    (args.common.into(), args.key, args.value, args.attach)
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, PartialEq, Eq, Hash, Debug)]

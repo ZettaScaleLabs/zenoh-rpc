@@ -17,5 +17,6 @@ pub mod session;
 pub mod subscription;
 
 pub mod prelude {
-    pub use crate::session::TypedSession;
+    pub use crate::session::SerdeSession;
+    pub use crate::session::CBOR;
 }
