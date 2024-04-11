@@ -45,6 +45,7 @@ panic="abort"
 
 [workspace.dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
+async-trait = "0.1.79"
 base64 = "0.21.0"
 bincode = { version = "1.3.3" }
 darling = "0.14"
@@ -64,9 +65,10 @@ serde_yaml = { version = "0.9" }
 syn = { version = "1.0", features = ["full", "visit-mut"] }
 syn-serde = { version = "0.2", features = ["json"] }
 thiserror = "1.0"
-zenoh =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev",  default-features = false}
-zenoh-util =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev" }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev" }
-zenoh-core =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev" }
-zenoh-macros = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_attachment", version = "0.11.0-dev" }
+zenoh =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev",  default-features = false}
+zenoh-util =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh-core =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh-macros = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh-ext =  { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }

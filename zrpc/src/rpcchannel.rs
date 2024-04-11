@@ -23,24 +23,31 @@ use zenoh::query::*;
 use zenoh::Session;
 
 use crate::request::Request;
+use crate::response::Response;
 use crate::result::RPCResult;
 use crate::serialize;
+use crate::serialize::deserialize_response;
 use crate::status::Code;
 use crate::status::Status;
 use crate::zrpcresult::{ZRPCError, ZRPCResult};
+use crate::WireMessage;
 
-#[derive(Clone)]
-pub struct ZRClientChannel {
+#[derive(Clone, Debug)]
+pub struct RPCClientChannel {
     z: Arc<Session>,
-    path: String,
+    service_name: String,
     server_uuid: Option<ZenohId>,
 }
 
-impl ZRClientChannel {
-    pub fn new(z: Arc<Session>, path: String, server_uuid: Option<ZenohId>) -> ZRClientChannel {
-        ZRClientChannel {
+impl RPCClientChannel {
+    pub fn new(
+        z: Arc<Session>,
+        service_name: String,
+        server_uuid: Option<ZenohId>,
+    ) -> RPCClientChannel {
+        RPCClientChannel {
             z,
-            path,
+            service_name,
             server_uuid,
         }
     }
@@ -56,9 +63,9 @@ impl ZRClientChannel {
     {
         let req = serialize::serialize_request(&request)?;
         let selector = format!(
-            "{}{}/eval?method_name={}",
-            self.path,
+            "@rpc/{}/service/{}/{}",
             self.server_uuid.unwrap(),
+            self.service_name,
             method
         );
         trace!("Sending {:?} to  {:?}", request, selector);
@@ -86,23 +93,21 @@ impl ZRClientChannel {
         log::trace!("Response from zenoh is {:?}", reply);
         if let Ok(reply) = reply {
             match reply.sample {
-                Ok(sample) => match sample.encoding() {
-                    &Encoding::APPLICATION_OCTET_STREAM => {
-                        let raw_data: Vec<u8> = sample.payload().into();
-                        log::trace!("Size of response is {}", raw_data.len());
-                        match serialize::deserialize_response(&raw_data) {
-                            Ok(r) => r,
-                            Err(e) => RPCResult::Err(Status::new(
-                                Code::InternalError,
-                                &format!("Cannot deserialize: {e:?}"),
-                            )),
-                        }
+                Ok(sample) => {
+                    let raw_data: Vec<u8> = sample.payload().into();
+                    let wmsg: WireMessage = deserialize_response(&raw_data).unwrap();
+                    // println!("Wire MSG is {:?}", wmsg);
+                    match wmsg.payload {
+                        Some(raw_data) => match serialize::deserialize_response::<U>(&raw_data) {
+                            Ok(r) => {
+                                // println!("Data is {:?}", r);
+                                RPCResult::Ok(Response::new(r))
+                            }
+                            Err(_) => RPCResult::Err(wmsg.status),
+                        },
+                        None => RPCResult::Err(wmsg.status),
                     }
-                    _ => RPCResult::Err(Status::new(
-                        Code::InternalError,
-                        "Response data is expected to be APP_OCTET_STREAM in Zenoh!!",
-                    )),
-                },
+                }
                 Err(e) => {
                     log::error!("Unable to get sample from {e:?}");
                     RPCResult::Err(Status::new(
@@ -118,52 +123,5 @@ impl ZRClientChannel {
                 &format!("No data from call_fun for Request {:?}", request),
             ))
         }
-    }
-
-    /// This function verifies is the server is still available to reply at requests
-    /// it first verifies that it is register in Zenoh, then it verifies if the peer is still connected,
-    /// and then verifies the state, it returns an std::io::Result, the Err case describe the error.
-    pub async fn verify_server(&self) -> ZRPCResult<bool> {
-        if self.server_uuid.is_none() {
-            return Ok(false);
-        }
-
-        log::trace!(
-            "Check server selector {}",
-            format!("{}{}/state", self.path, self.server_uuid.unwrap())
-        );
-        let selector = format!("{}{}/state", self.path, self.server_uuid.unwrap());
-        let replies = self.z.get(&selector).target(QueryTarget::All).res().await?;
-
-        let reply = replies.recv_async().await;
-        log::trace!("Response from zenoh is {:?}", reply);
-
-        if let Ok(reply) = reply {
-            match reply.sample {
-                Ok(sample) => match sample.encoding() {
-                    &Encoding::APPLICATION_OCTET_STREAM => {
-                        let raw_data: Vec<u8> = sample.payload().into();
-                        let ca = crate::serialize::deserialize_state::<crate::types::ComponentState>(
-                            &raw_data,
-                        )?;
-                        if ca.status == crate::types::ComponentStatus::SERVING {
-                            return Ok(true);
-                        }
-                    }
-                    _ => {
-                        return Err(ZRPCError::ZenohError(
-                            "Server information is not correctly encoded".to_string(),
-                        ))
-                    }
-                },
-                Err(e) => {
-                    log::error!("Unable to get sample from {e:?}");
-                    return Err(ZRPCError::ZenohError(format!(
-                        "Unable to get sample from {e:?}"
-                    )));
-                }
-            }
-        }
-        Ok(false)
     }
 }

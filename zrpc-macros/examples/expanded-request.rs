@@ -35,7 +35,7 @@ use zrpc::ZServe;
 
 use zrpc::request::Request;
 use zrpc::response::Response;
-use zrpc::status::{Status, Code};
+use zrpc::status::{Code, Status};
 
 pub trait Hello: Clone {
     fn hello(
@@ -343,7 +343,7 @@ where
                                     zrpc::serialize::deserialize_request::<Request<HelloRequest>>(
                                         &value.payload.contiguous(),
                                     )?;
-                                let resp : RPCResult<HelloResponse> = ser.hello(req).await.into();
+                                let resp: RPCResult<HelloResponse> = ser.hello(req).await.into();
                                 zrpc::serialize::serialize_response(&resp)
                             }
                             "add" => {
@@ -351,7 +351,7 @@ where
                                     zrpc::serialize::deserialize_request::<Request<AddRequest>>(
                                         &value.payload.contiguous(),
                                     )?;
-                                let resp : RPCResult<AddResponse> = ser.add(req).await.into();
+                                let resp: RPCResult<AddResponse> = ser.add(req).await.into();
                                 zrpc::serialize::serialize_response(&resp)
                             }
                             "sub" => {
@@ -359,7 +359,7 @@ where
                                     zrpc::serialize::deserialize_request::<Request<SubRequest>>(
                                         &value.payload.contiguous(),
                                     )?;
-                                let resp : RPCResult<SubResponse> = ser.sub(req).await.into();
+                                let resp: RPCResult<SubResponse> = ser.sub(req).await.into();
                                 zrpc::serialize::serialize_response(&resp)
                             }
                             _ => {
@@ -504,12 +504,10 @@ pub struct HelloRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AddRequest {
-}
+pub struct AddRequest {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SubRequest {
-}
+pub struct SubRequest {}
 
 /// The response sent over the wire from the server to the client.
 
@@ -715,12 +713,11 @@ impl HelloClient {
             let resp = self.ch.call_fun(request, "add");
             let dur = std::time::Duration::from_secs(60u16 as u64);
             match async_std::future::timeout(dur, resp).await {
-                Ok(r) =>r.into(),
+                Ok(r) => r.into(),
                 Err(e) => Err(Status::new(Code::Timeout, "")),
             }
         }
     }
-
 
     #[allow(unused, clippy::manual_async_fn)]
     pub fn sub(
@@ -731,7 +728,7 @@ impl HelloClient {
             let resp = self.ch.call_fun(request, "sub");
             let dur = std::time::Duration::from_secs(60u16 as u64);
             match async_std::future::timeout(dur, resp).await {
-                Ok(r) =>r.into(),
+                Ok(r) => r.into(),
                 Err(e) => Err(Status::new(Code::Timeout, "")),
             }
         }
@@ -858,18 +855,22 @@ async fn main() {
 
         println!("Verify server: {:?}", client.verify_server().await);
 
-        let hello = client.hello(Request::new(HelloRequest{name:"client".to_string()})).await;
+        let hello = client
+            .hello(Request::new(HelloRequest {
+                name: "client".to_string(),
+            }))
+            .await;
         println!("Res is: {:?}", hello);
-        let res = client.add(Request::new(AddRequest { })).await;
+        let res = client.add(Request::new(AddRequest {})).await;
         println!("Res is: {:?}", res);
 
-        let res = client.add(Request::new(AddRequest { })).await;
+        let res = client.add(Request::new(AddRequest {})).await;
         println!("Res is: {:?}", res);
 
-        let res = client.add(Request::new(AddRequest { })).await;
+        let res = client.add(Request::new(AddRequest {})).await;
         println!("Res is: {:?}", res);
 
-        let res = client.sub(Request::new(SubRequest { })).await;
+        let res = client.sub(Request::new(SubRequest {})).await;
         println!("Res is: {:?}", res);
 
         server.stop(s).await.unwrap();
