@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serialize::{deserialize_request, serialize_request, serialize_response};
 use status::{Code, Status};
 
-use std::{collections::HashMap, future::Future, hash::Hash, sync::Arc};
+use std::{collections::HashMap, future::Future, hash::Hash, sync::Arc, time::Duration};
 pub mod zchannel;
 pub mod zrchannel;
 pub use zchannel::ZClientChannel;
@@ -36,10 +36,7 @@ pub mod serialize;
 pub mod status;
 pub mod zrpcresult;
 
-use zenoh::{
-    key_expr::format::KeFormat,
-    prelude::{r#async::*, *},
-};
+use zenoh::{key_expr::format::KeFormat, prelude::r#async::*};
 use zrpcresult::ZRPCResult;
 
 pub type BoxFuture<T, E> = std::pin::Pin<Box<dyn self::Future<Output = Result<T, E>> + 'static>>;
@@ -66,14 +63,25 @@ impl Server {
     }
 
     pub async fn serve(&self) -> () {
-        // this must join a group per service
-
-        // register the queryables
+        let mut tokens = vec![];
+        // register the queryables and declare a liveliness token
         let ke = format!("@rpc/{}/**", self.instance_uuid());
 
         let ke_format =
             KeFormat::new("@rpc/${zid:*}/service/${service_name:*}/${method_name:*}").unwrap();
         let queryable = self.session.declare_queryable(&ke).res().await.unwrap();
+
+        for k in self.services.keys() {
+            let ke = format!("@rpc/{}/service/{k}", self.instance_uuid());
+            let lt = self
+                .session
+                .liveliness()
+                .declare_token(ke)
+                .res()
+                .await
+                .unwrap();
+            tokens.push(lt)
+        }
 
         loop {
             let query = queryable.recv_async().await.unwrap();

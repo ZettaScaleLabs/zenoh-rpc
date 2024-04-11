@@ -36,27 +36,23 @@ use crate::WireMessage;
 pub struct RPCClientChannel {
     z: Arc<Session>,
     service_name: String,
-    server_uuid: Option<ZenohId>,
 }
 
 impl RPCClientChannel {
-    pub fn new(
-        z: Arc<Session>,
-        service_name: String,
-        server_uuid: Option<ZenohId>,
-    ) -> RPCClientChannel {
-        RPCClientChannel {
-            z,
-            service_name,
-            server_uuid,
-        }
+    pub fn new(z: Arc<Session>, service_name: String) -> RPCClientChannel {
+        RPCClientChannel { z, service_name }
     }
 
     /// This functions calls the get on the workspace for the eval
     /// it serialized the request on the as properties in the selector
     /// the request is first serialized as json and then encoded in base64 and
     /// passed as a property named req
-    async fn send<T>(&self, request: &Request<T>, method: &str) -> ZRPCResult<Receiver<Reply>>
+    async fn send<T>(
+        &self,
+        server_id: ZenohId,
+        request: &Request<T>,
+        method: &str,
+    ) -> ZRPCResult<Receiver<Reply>>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
@@ -64,9 +60,7 @@ impl RPCClientChannel {
         let req = serialize::serialize_request(&request)?;
         let selector = format!(
             "@rpc/{}/service/{}/{}",
-            self.server_uuid.unwrap(),
-            self.service_name,
-            method
+            server_id, self.service_name, method
         );
         trace!("Sending {:?} to  {:?}", request, selector);
         Ok(self
@@ -80,14 +74,19 @@ impl RPCClientChannel {
 
     /// This function calls the eval on the server and deserialized the result
     /// if the value is not deserializable or the eval returns none it returns an IOError
-    pub async fn call_fun<T, U>(&self, request: Request<T>, method: &str) -> RPCResult<U>
+    pub async fn call_fun<T, U>(
+        &self,
+        server_id: ZenohId,
+        request: Request<T>,
+        method: &str,
+    ) -> RPCResult<U>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
         U: Serialize + Clone + std::fmt::Debug,
         for<'de3> U: Deserialize<'de3>,
     {
-        let data_receiver = self.send(&request, method).await.unwrap();
+        let data_receiver = self.send(server_id, &request, method).await.unwrap();
         //takes only one, eval goes to only one
         let reply = data_receiver.recv_async().await;
         log::trace!("Response from zenoh is {:?}", reply);

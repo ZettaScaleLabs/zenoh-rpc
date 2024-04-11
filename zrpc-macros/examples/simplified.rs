@@ -24,21 +24,24 @@ use async_std::io::ReadExt;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
 use syn::token::As;
+use zenoh::key_expr::format::KeFormat;
+use zenoh::key_expr::keyexpr_tree::AsNode;
 use zenoh::prelude::ZenohId;
 use zenoh::queryable::Query;
 use zrpc::result::RPCResult;
 use zrpc::rpcchannel::RPCClientChannel;
 use zrpc::{BoxFuture, Server};
 
-use std::str;
+use std::str::{self, FromStr};
 use std::time::Duration;
-use zenoh::{query, Session};
+use zenoh::{query, Session, SessionDeclarations};
 
 use serde::{Deserialize, Serialize};
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 use zrpc::{Message, ZServe};
 
 use async_trait::async_trait;
+use zenoh::prelude::r#async::*;
 use zrpc::request::Request;
 use zrpc::response::Response;
 use zrpc::status::{Code, Status};
@@ -209,19 +212,28 @@ pub struct SubResponse {
 
 #[allow(unused)]
 #[derive(Clone, Debug)]
-pub struct HelloClient {
+pub struct HelloClient<'a> {
     ch: RPCClientChannel,
     server_uuid: ZenohId,
+    ke_format: KeFormat<'a>,
+    z: Arc<Session>,
 }
 
 // generated client code
 
-impl HelloClient {
-    pub fn new(z: async_std::sync::Arc<zenoh::Session>, instance_id: ZenohId) -> HelloClient {
-        let new_client = RPCClientChannel::new(z, "Hello".into(), Some(instance_id));
+impl<'a> HelloClient<'a> {
+    pub async fn new(
+        z: async_std::sync::Arc<zenoh::Session>,
+        instance_id: ZenohId,
+    ) -> HelloClient<'a> {
+        let new_client = RPCClientChannel::new(z.clone(), "Hello".into());
+
+        let ke_format = KeFormat::new("@rpc/${zid:*}/service/Hello").unwrap();
         HelloClient {
             ch: new_client,
             server_uuid: instance_id,
+            ke_format,
+            z,
         }
     }
     pub fn get_server_uuid(&self) -> ZenohId {
@@ -232,7 +244,7 @@ impl HelloClient {
         &self,
         request: Request<HelloRequest>,
     ) -> Result<Response<HelloResponse>, Status> {
-        let resp = self.ch.call_fun(request, "hello");
+        let resp = self.ch.call_fun(self.find_server().await, request, "hello");
         let dur = std::time::Duration::from_secs(60u16 as u64);
         match async_std::future::timeout(dur, resp).await {
             Ok(r) => r.into(),
@@ -241,7 +253,7 @@ impl HelloClient {
     }
 
     pub async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
-        let resp = self.ch.call_fun(request, "add");
+        let resp = self.ch.call_fun(self.find_server().await, request, "add");
         let dur = std::time::Duration::from_secs(60u16 as u64);
         match async_std::future::timeout(dur, resp).await {
             Ok(r) => r.into(),
@@ -250,12 +262,38 @@ impl HelloClient {
     }
 
     pub async fn sub(&self, request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
-        let resp = self.ch.call_fun(request, "sub");
+        let resp = self.ch.call_fun(self.find_server().await, request, "sub");
         let dur = std::time::Duration::from_secs(60u16 as u64);
         match async_std::future::timeout(dur, resp).await {
             Ok(r) => r.into(),
             Err(e) => Err(Status::new(Code::Timeout, "")),
         }
+    }
+
+    async fn find_server(&self) -> ZenohId {
+        let res = self
+            .z
+            .liveliness()
+            .get("@rpc/*/service/Hello")
+            .res()
+            .await
+            .unwrap();
+
+        let mut ids: Vec<ZenohId> = res
+            .into_iter()
+            .map(|e| self.extract_id_from_ke(e.sample.unwrap().key_expr()))
+            .collect();
+        ids.pop().unwrap()
+    }
+
+    fn extract_id_from_ke(&self, ke: &KeyExpr) -> ZenohId {
+        self.ke_format
+            .parse(ke)
+            .unwrap()
+            .get("zid")
+            .map(ZenohId::from_str)
+            .unwrap()
+            .unwrap()
     }
 }
 
@@ -274,7 +312,7 @@ async fn main() {
         let z = zsession.clone();
         let ser_uuid = zsession.zid();
         println!("Server instance UUID {}", ser_uuid);
-        let client = HelloClient::new(zsession.clone(), ser_uuid);
+        let client = HelloClient::new(zsession.clone(), ser_uuid).await;
 
         let service = MyServer {
             ser_name: "test service".to_string(),
