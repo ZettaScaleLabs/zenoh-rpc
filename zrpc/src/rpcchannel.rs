@@ -68,7 +68,7 @@ impl RPCClientChannel {
         Ok(self
             .z
             .get(&selector)
-            .value(req)
+            .with_value(req)
             .target(QueryTarget::All)
             .timeout(tout)
             .res()
@@ -97,7 +97,7 @@ impl RPCClientChannel {
         if let Ok(reply) = reply {
             match reply.sample {
                 Ok(sample) => {
-                    let raw_data: Vec<u8> = sample.payload().into();
+                    let raw_data: Vec<u8> = sample.payload.contiguous().to_vec();
                     let wmsg: WireMessage = deserialize(&raw_data).unwrap();
                     // println!("Wire MSG is {:?}", wmsg);
                     match wmsg.payload {

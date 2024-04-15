@@ -66,4 +66,5 @@ default = [
   "state_json",
   "transport_tcp",
   "transport_udp",
+  "zenoh/unstable"
 ]

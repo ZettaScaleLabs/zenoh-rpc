@@ -474,19 +474,19 @@ impl<'a> ServiceGenerator<'a> {
 
                         let mut ids: Vec<zenoh::prelude::ZenohId> = res
                             .into_iter()
-                            .map(|e| self.extract_id_from_ke(e.sample.unwrap().key_expr()))
+                            .map(|e| self.extract_id_from_ke(&e.sample.unwrap().key_expr))
                             .collect();
                         ids.pop().unwrap()
                     }
 
                     fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> zenoh::prelude::ZenohId {
                         use std::str::FromStr;
-                        self.ke_format
+                        zenoh::prelude::ZenohId::from_str(
+                            self.ke_format
                             .parse(ke)
                             .unwrap()
                             .get("zid")
-                            .map(zenoh::prelude::ZenohId::from_str)
-                            .unwrap()
+                            .unwrap().unwrap())
                             .unwrap()
                     }
             }

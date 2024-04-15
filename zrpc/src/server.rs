@@ -13,7 +13,6 @@
 
 use async_std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
-// use zenoh::key_expr::format::KeFormat;
 use zenoh::liveliness::LivelinessToken;
 use zenoh::prelude::r#async::*;
 
@@ -52,14 +51,6 @@ impl Server {
         // register the queryables and declare a liveliness token
         let ke = format!("@rpc/{}/**", self.instance_uuid());
 
-        // let ke_format =
-        //     KeFormat::new("@rpc/${zid:*}/service/${service_name:*}/${method_name:*}").unwrap();
-        // commenting because of
-        //    | |__________^ implementation of `IKeFormatStorage` is not general enough
-        // |
-        // = note: `IKeFormatStorage<'1>` would have to be implemented for the type `Vec<Segment<'0>>`, for any two lifetimes `'0` and `'1`...
-        // = note: ...but `IKeFormatStorage<'2>` is actually implemented for the type `Vec<Segment<'2>>`, for some specific lifetime `'2`
-
         let queryable = self.session.declare_queryable(&ke).res().await.unwrap();
 
         for k in self.services.keys() {
@@ -79,49 +70,49 @@ impl Server {
         loop {
             let query = queryable.recv_async().await.unwrap();
 
-            let selector = query.selector();
+            let svcs = self.services.clone();
+            let c_ke = KeyExpr::try_from(ke.clone()).unwrap();
+            async_std::task::spawn(async move {
+                let ke = query.selector().key_expr.clone();
 
-            // here we should get the name of the service and from it the name of the service
-            // and the name of the method, we use the ke formatter
-            // println!("Received selector: {selector:?}");
+                // here we should get the name of the service and from it the name of the service
+                // and the name of the method, we use the ke formatter
 
-            // let parsed = ke_format.parse(&selector.key_expr).unwrap();
+                let service_name = Self::get_service_name(&ke);
+                let method_name = Self::get_method_name(&ke);
+                let svc = svcs.get(service_name).unwrap();
+                let payload: Vec<u8> = query.value().unwrap().payload.contiguous().to_vec();
 
-            let service_name = Self::get_service_name(&selector.key_expr); //parsed.get("service_name").unwrap();
-            let method_name = Self::get_method_name(&selector.key_expr); //parsed.get("method_name").unwrap();
-                                                                         // println!("Calling {service_name}/{method_name}");
-            let svc = self.services.get(service_name).unwrap();
+                let msg = Message {
+                    method: method_name.into(),
+                    body: payload,
+                    metadata: HashMap::new(),
+                    status: Status::new(Code::Accepted, ""),
+                };
 
-            let payload: Vec<u8> = query.payload().unwrap().into();
-            // let attachments : HashMap<String, String> = query.attachment().unwrap().into();
-            let msg = Message {
-                method: method_name.into(),
-                body: payload,
-                metadata: HashMap::new(),
-                status: Status::new(Code::Accepted, ""),
-            };
+                let resp = svc.call(msg).await;
+                // println!("Response is {resp:?}");
+                let resp = match resp {
+                    Ok(msg) => {
+                        let wmsg = WireMessage {
+                            payload: Some(msg.body),
+                            status: Status::new(Code::Ok, ""),
+                        };
 
-            let resp = svc.call(msg).await;
-            // println!("Response is {resp:?}");
-            let resp = match resp {
-                Ok(msg) => {
-                    let wmsg = WireMessage {
-                        payload: Some(msg.body),
-                        status: Status::new(Code::Ok, ""),
-                    };
-
-                    serialize(&wmsg)
+                        serialize(&wmsg)
+                    }
+                    Err(e) => {
+                        let wmsg = WireMessage {
+                            payload: None,
+                            status: e,
+                        };
+                        serialize(&wmsg)
+                    }
                 }
-                Err(e) => {
-                    let wmsg = WireMessage {
-                        payload: None,
-                        status: e,
-                    };
-                    serialize(&wmsg)
-                }
-            }
-            .unwrap();
-            query.reply(selector.key_expr, resp).res().await.unwrap();
+                .unwrap();
+                let sample = Sample::new(c_ke, resp);
+                query.reply(Ok(sample)).res().await.unwrap();
+            });
         }
     }
 

@@ -14,9 +14,9 @@
 [workspace]
 resolver = "2"
 
-members = ["zenoh-typed", "zrpc", "zrpc-derive"]
+members = ["zrpc", "zrpc-derive"]
 
-exclude = ["zrpc-perf"]
+exclude = ["zenoh-typed", "zrpc-perf"]
 
 [workspace.package]
 authors = ["gabrik <gabriele.baldoni@gmail.com>"]
@@ -58,10 +58,10 @@ serde_yaml = { version = "0.9" }
 syn = { version = "1.0", features = ["full", "visit-mut"] }
 syn-serde = { version = "0.2", features = ["json"] }
 thiserror = "1.0"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev", default-features = false }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
-zenoh-ext = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
-zenoh-macros = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "protocol_changes", version = "0.11.0-dev" }
+zenoh = { version = "0.10.1-rc", default-features = false }
+zenoh-codec = {  version = "0.10.1-rc" }
+zenoh-core = {  version = "0.10.1-rc" }
+zenoh-ext = {  version = "0.10.1-rc" }
+zenoh-macros = {  version = "0.10.1-rc" }
+zenoh-protocol = {  version = "0.10.1-rc" }
+zenoh-util = {  version = "0.10.1-rc" }

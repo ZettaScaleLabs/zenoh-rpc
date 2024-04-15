@@ -225,19 +225,17 @@ impl<'a> HelloClient<'a> {
 
         let mut ids: Vec<ZenohId> = res
             .into_iter()
-            .map(|e| self.extract_id_from_ke(e.sample.unwrap().key_expr()))
+            .map(|e| self.extract_id_from_ke(&e.sample.unwrap().key_expr))
             .collect();
         ids.pop().unwrap()
     }
 
     fn extract_id_from_ke(&self, ke: &KeyExpr) -> ZenohId {
-        self.ke_format
+        ZenohId::from_str(self.ke_format
             .parse(ke)
             .unwrap()
             .get("zid")
-            .map(ZenohId::from_str)
-            .unwrap()
-            .unwrap()
+            .unwrap().unwrap()).unwrap()
     }
 }
 
