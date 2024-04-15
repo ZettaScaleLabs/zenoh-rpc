@@ -231,11 +231,15 @@ impl<'a> HelloClient<'a> {
     }
 
     fn extract_id_from_ke(&self, ke: &KeyExpr) -> ZenohId {
-        ZenohId::from_str(self.ke_format
-            .parse(ke)
-            .unwrap()
-            .get("zid")
-            .unwrap().unwrap()).unwrap()
+        ZenohId::from_str(
+            self.ke_format
+                .parse(ke)
+                .unwrap()
+                .get("zid")
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap()
     }
 }
 
