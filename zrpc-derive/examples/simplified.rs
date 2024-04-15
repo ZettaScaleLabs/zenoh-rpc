@@ -11,40 +11,23 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-// #![feature(prelude_import)]
-#![allow(clippy::manual_async_fn)]
-#![allow(clippy::large_enum_variant)]
-// #[prelude_import]
-extern crate serde;
-extern crate std;
-
-use std::prelude::v1::*;
-
 use async_std::io::ReadExt;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
-use syn::token::As;
 use zenoh::key_expr::format::KeFormat;
-use zenoh::key_expr::keyexpr_tree::AsNode;
+
 use zenoh::prelude::ZenohId;
-use zenoh::queryable::Query;
-use zrpc::result::RPCResult;
-use zrpc::rpcchannel::RPCClientChannel;
-use zrpc::{BoxFuture, Server};
+
+use zrpc::prelude::*;
 
 use std::str::{self, FromStr};
 use std::time::Duration;
-use zenoh::{query, Session, SessionDeclarations};
+use zenoh::{Session, SessionDeclarations};
 
 use serde::{Deserialize, Serialize};
-use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
-use zrpc::{Message, ZServe};
 
 use async_trait::async_trait;
 use zenoh::prelude::r#async::*;
-use zrpc::request::Request;
-use zrpc::response::Response;
-use zrpc::status::{Code, Status};
 
 // this is the user defined trait
 #[async_trait]
@@ -109,9 +92,13 @@ where
     }
 }
 
-impl<T> zrpc::Service for HelloServer<T>
+unsafe impl<T:  Hello> Send for HelloServer<T> {}
+unsafe impl<T: Hello> Sync for HelloServer<T> {}
+
+// #[async_trait]
+impl<T> zrpc::prelude::Service for HelloServer<T>
 where
-    T: Hello + 'static,
+    T: Hello + Send + Sync + 'static,
 {
     // type Response = Message;
 
@@ -119,7 +106,8 @@ where
 
     // type Future = BoxFuture<Self::Response, Self::Error>;
 
-    fn call(&self, req: Message) -> BoxFuture<Message, Status> {
+    fn call(&self, req: Message) -> //Result<Message, Status> {
+        BoxFuture<Message, Status> {
         // extract selector
         // let selector = req.selector();
         // // getting the query parameters
@@ -131,8 +119,7 @@ where
         match req.method.as_str() {
             "hello" => {
                 // let raw_value: Vec<u8> = value.payload().into();
-                let req = zrpc::serialize::deserialize_request::<Request<HelloRequest>>(&req.body)
-                    .unwrap();
+                let req = zrpc::prelude::deserialize::<Request<HelloRequest>>(&req.body).unwrap();
                 let inner = self.inner.clone();
                 let fut = async move {
                     match inner.hello(req).await {
@@ -141,11 +128,11 @@ where
                     }
                 };
                 Box::pin(fut)
+                // fut.await
             }
             "add" => {
                 // let raw_value: Vec<u8> = value.payload().into();
-                let req =
-                    zrpc::serialize::deserialize_request::<Request<AddRequest>>(&req.body).unwrap();
+                let req = zrpc::prelude::deserialize::<Request<AddRequest>>(&req.body).unwrap();
                 let inner = self.inner.clone();
                 let fut = async move {
                     match inner.add(req).await {
@@ -154,11 +141,11 @@ where
                     }
                 };
                 Box::pin(fut)
+                // fut.await
             }
             "sub" => {
                 // let raw_value: Vec<u8> = value.payload().into();
-                let req =
-                    zrpc::serialize::deserialize_request::<Request<SubRequest>>(&req.body).unwrap();
+                let req = zrpc::prelude::deserialize::<Request<SubRequest>>(&req.body).unwrap();
                 let inner = self.inner.clone();
                 let fut = async move {
                     match inner.sub(req).await {
@@ -167,14 +154,18 @@ where
                     }
                 };
                 Box::pin(fut)
+                // fut.await
             }
 
-            _ => Box::pin(async move { Err(Status::new(Code::Unvailable, "Unavailable")) }),
+            _ => {
+                Box::pin(async move { Err(Status::new(Code::Unvailable, "Unavailable")) })
+                // Err(Status::new(Code::Unvailable, "Unavailable")) 
+            },
         }
     }
 
     fn name(&self) -> String {
-        return "Hello".into();
+        "Hello".into()
     }
 }
 
@@ -214,60 +205,48 @@ pub struct SubResponse {
 #[derive(Clone, Debug)]
 pub struct HelloClient<'a> {
     ch: RPCClientChannel,
-    server_uuid: ZenohId,
     ke_format: KeFormat<'a>,
     z: Arc<Session>,
+    tout: Duration,
 }
 
 // generated client code
 
 impl<'a> HelloClient<'a> {
-    pub async fn new(
-        z: async_std::sync::Arc<zenoh::Session>,
-        instance_id: ZenohId,
-    ) -> HelloClient<'a> {
+    pub async fn new(z: async_std::sync::Arc<zenoh::Session>) -> HelloClient<'a> {
         let new_client = RPCClientChannel::new(z.clone(), "Hello".into());
-
+        let tout = std::time::Duration::from_secs(60u16 as u64);
         let ke_format = KeFormat::new("@rpc/${zid:*}/service/Hello").unwrap();
         HelloClient {
             ch: new_client,
-            server_uuid: instance_id,
             ke_format,
             z,
+            tout,
         }
-    }
-    pub fn get_server_uuid(&self) -> ZenohId {
-        self.server_uuid
     }
 
     pub async fn hello(
         &self,
         request: Request<HelloRequest>,
     ) -> Result<Response<HelloResponse>, Status> {
-        let resp = self.ch.call_fun(self.find_server().await, request, "hello");
-        let dur = std::time::Duration::from_secs(60u16 as u64);
-        match async_std::future::timeout(dur, resp).await {
-            Ok(r) => r.into(),
-            Err(e) => Err(Status::new(Code::Timeout, "")),
-        }
+        self.ch
+            .call_fun(self.find_server().await, request, "hello", self.tout)
+            .await
+            .into()
     }
 
     pub async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
-        let resp = self.ch.call_fun(self.find_server().await, request, "add");
-        let dur = std::time::Duration::from_secs(60u16 as u64);
-        match async_std::future::timeout(dur, resp).await {
-            Ok(r) => r.into(),
-            Err(e) => Err(Status::new(Code::Timeout, "")),
-        }
+        self.ch
+            .call_fun(self.find_server().await, request, "add", self.tout)
+            .await
+            .into()
     }
 
     pub async fn sub(&self, request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
-        let resp = self.ch.call_fun(self.find_server().await, request, "sub");
-        let dur = std::time::Duration::from_secs(60u16 as u64);
-        match async_std::future::timeout(dur, resp).await {
-            Ok(r) => r.into(),
-            Err(e) => Err(Status::new(Code::Timeout, "")),
-        }
+        self.ch
+            .call_fun(self.find_server().await, request, "sub", self.tout)
+            .await
+            .into()
     }
 
     async fn find_server(&self) -> ZenohId {
@@ -310,46 +289,43 @@ async fn main() {
         let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
         let z = zsession.clone();
-        let ser_uuid = zsession.zid();
-        println!("Server instance UUID {}", ser_uuid);
-        let client = HelloClient::new(zsession.clone(), ser_uuid).await;
-
-        let service = MyServer {
-            ser_name: "test service".to_string(),
-            counter: Arc::new(Mutex::new(0u64)),
-        };
-
-        let mut server = Server::new(z);
-        server.add_service(Arc::new(HelloServer::new(service)));
 
         task::spawn(async move {
-            press_to_continue().await;
-
-            let hello = client
-                .hello(Request::new(HelloRequest {
-                    name: "client".to_string(),
-                }))
-                .await;
-            println!("Res is: {:?}", hello);
-
-            press_to_continue().await;
-            let res = client.add(Request::new(AddRequest {})).await;
-            println!("Res is: {:?}", res);
-
-            press_to_continue().await;
-            let res = client.add(Request::new(AddRequest {})).await;
-            println!("Res is: {:?}", res);
-
-            press_to_continue().await;
-            let res = client.add(Request::new(AddRequest {})).await;
-            println!("Res is: {:?}", res);
-
-            press_to_continue().await;
-            let res = client.sub(Request::new(SubRequest {})).await;
-            println!("Res is: {:?}", res);
+            let service = MyServer {
+                ser_name: "test service".to_string(),
+                counter: Arc::new(Mutex::new(0u64)),
+            };
+            let mut server = zrpc::prelude::Server::new(z);
+            server.add_service(Arc::new(HelloServer::new(service)));
+            server.serve().await;
         });
 
-        server.serve().await;
+        let client = HelloClient::new(zsession).await;
+
+        press_to_continue().await;
+
+        let hello = client
+            .hello(Request::new(HelloRequest {
+                name: "client".to_string(),
+            }))
+            .await;
+        println!("Res is: {:?}", hello);
+
+        press_to_continue().await;
+        let res = client.add(Request::new(AddRequest {})).await;
+        println!("Res is: {:?}", res);
+
+        press_to_continue().await;
+        let res = client.add(Request::new(AddRequest {})).await;
+        println!("Res is: {:?}", res);
+
+        press_to_continue().await;
+        let res = client.add(Request::new(AddRequest {})).await;
+        println!("Res is: {:?}", res);
+
+        press_to_continue().await;
+        let res = client.sub(Request::new(SubRequest {})).await;
+        println!("Res is: {:?}", res);
     }
 }
 

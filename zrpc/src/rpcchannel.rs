@@ -14,6 +14,8 @@
 extern crate base64;
 extern crate serde;
 
+use std::time::Duration;
+
 use async_std::sync::Arc;
 use flume::Receiver;
 use log::trace;
@@ -25,12 +27,11 @@ use zenoh::Session;
 use crate::request::Request;
 use crate::response::Response;
 use crate::result::RPCResult;
-use crate::serialize;
-use crate::serialize::deserialize_response;
+use crate::serialize::{deserialize, serialize};
 use crate::status::Code;
 use crate::status::Status;
-use crate::zrpcresult::{ZRPCError, ZRPCResult};
-use crate::WireMessage;
+use crate::types::WireMessage;
+use crate::zrpcresult::ZRPCResult;
 
 #[derive(Clone, Debug)]
 pub struct RPCClientChannel {
@@ -52,12 +53,13 @@ impl RPCClientChannel {
         server_id: ZenohId,
         request: &Request<T>,
         method: &str,
+        tout: Duration,
     ) -> ZRPCResult<Receiver<Reply>>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
     {
-        let req = serialize::serialize_request(&request)?;
+        let req = serialize(&request)?;
         let selector = format!(
             "@rpc/{}/service/{}/{}",
             server_id, self.service_name, method
@@ -68,6 +70,7 @@ impl RPCClientChannel {
             .get(&selector)
             .value(req)
             .target(QueryTarget::All)
+            .timeout(tout)
             .res()
             .await?)
     }
@@ -79,6 +82,7 @@ impl RPCClientChannel {
         server_id: ZenohId,
         request: Request<T>,
         method: &str,
+        tout: Duration,
     ) -> RPCResult<U>
     where
         T: Serialize + Clone + std::fmt::Debug,
@@ -86,7 +90,7 @@ impl RPCClientChannel {
         U: Serialize + Clone + std::fmt::Debug,
         for<'de3> U: Deserialize<'de3>,
     {
-        let data_receiver = self.send(server_id, &request, method).await.unwrap();
+        let data_receiver = self.send(server_id, &request, method, tout).await.unwrap();
         //takes only one, eval goes to only one
         let reply = data_receiver.recv_async().await;
         log::trace!("Response from zenoh is {:?}", reply);
@@ -94,10 +98,10 @@ impl RPCClientChannel {
             match reply.sample {
                 Ok(sample) => {
                     let raw_data: Vec<u8> = sample.payload().into();
-                    let wmsg: WireMessage = deserialize_response(&raw_data).unwrap();
+                    let wmsg: WireMessage = deserialize(&raw_data).unwrap();
                     // println!("Wire MSG is {:?}", wmsg);
                     match wmsg.payload {
-                        Some(raw_data) => match serialize::deserialize_response::<U>(&raw_data) {
+                        Some(raw_data) => match deserialize::<U>(&raw_data) {
                             Ok(r) => {
                                 // println!("Data is {:?}", r);
                                 RPCResult::Ok(Response::new(r))

@@ -26,15 +26,15 @@ where
     }
 }
 
-impl<T> Into<Result<Response<T>, Status>> for RPCResult<T>
+impl<T> From<RPCResult<T>> for Result<Response<T>, Status>
 where
     T: Serialize + Clone + std::fmt::Debug,
     for<'de2> T: Deserialize<'de2>,
 {
-    fn into(self) -> Result<Response<T>, Status> {
-        match self {
-            Self::Ok(r) => Ok(r),
-            Self::Err(s) => Err(s),
+    fn from(value: RPCResult<T>) -> Self {
+        match value {
+            RPCResult::Ok(r) => Ok(r),
+            RPCResult::Err(s) => Err(s),
         }
     }
 }

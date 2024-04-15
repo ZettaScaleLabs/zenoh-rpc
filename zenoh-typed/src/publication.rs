@@ -13,20 +13,15 @@
 
 use std::future::Ready;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
-// use crate::traits::Serialize;
-use zenoh::buffers::writer::Writer;
-use zenoh::payload::{self, Deserialize as ZDeserialize, Payload, Serialize as ZSerialize};
+use zenoh::payload::{Payload, Serialize as ZSerialize};
 use zenoh::prelude::QoSBuilderTrait;
 use zenoh::publication::PublisherPutBuilder;
 use zenoh::Result as ZResult;
 use zenoh::{
-    prelude::{sync::SyncResolve, Encoding, SampleKind},
+    prelude::{sync::SyncResolve},
     publication::{CongestionControl, Priority, Publisher, PublisherBuilder},
-    sample::Locality,
 };
-use zenoh_codec::WCodec;
 use zenoh_core::{AsyncResolve, Resolvable};
 
 pub struct TypePublisherBuilder<'a, 'b: 'a, T, S> {

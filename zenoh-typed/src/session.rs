@@ -16,20 +16,16 @@ use crate::publication::TypePublisherBuilder;
 use crate::subscription::TypedSubscriberBuilder;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::io::Read;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use zenoh::publication::SessionPutBuilder;
 
-use zenoh::payload::{self, Deserialize as ZDeserialize, Serialize as ZSerialize};
+use zenoh::payload::{Deserialize as ZDeserialize, Serialize as ZSerialize};
 use zenoh::prelude::Encoding;
 
 use zenoh::handlers::DefaultHandler;
 use zenoh::prelude::r#async::*;
-// use zenoh::publication::PutBuilder;
-// use zenoh::subscriber::{PushMode, SubscriberBuilder};
 use zenoh::Session;
-use zenoh_core::{bail, zerror};
 
 #[derive(Clone)]
 pub struct CBOR;
@@ -53,9 +49,6 @@ where
     type Error = serde_cbor::Error;
 
     fn deserialize(self, v: &'a Payload) -> Result<T, Self::Error> {
-        // let mut buff = vec![];
-        // let read = v.reader().read_to_end(&mut buff);
-        // println!("Read: {read:?}");
         let data = serde_cbor::from_reader(v.reader())?;
         Ok(data)
     }

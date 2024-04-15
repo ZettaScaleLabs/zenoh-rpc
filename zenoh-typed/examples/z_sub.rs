@@ -16,7 +16,6 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use zenoh::config::Config;
 use zenoh::prelude::r#async::*;
-use zenoh::subscriber::Subscriber;
 use zenoh_typed::prelude::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
