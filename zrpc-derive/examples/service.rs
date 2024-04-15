@@ -80,48 +80,45 @@ async fn main() {
     let z = zsession.clone();
     let client = HelloClient::new(zsession).await;
 
-    let service = MyServer {
-        ser_name: "test service".to_string(),
-        counter: Arc::new(Mutex::new(0u64)),
-    };
-
-    let mut server = Server::new(z);
-    server.add_service(Arc::new(HelloServer::new(service)));
-
     task::spawn(async move {
-        press_to_continue().await;
-
-        let hello = client
-            .hello(Request::new(HelloRequest {
-                name: "client".to_string(),
-            }))
-            .await;
-        println!("Res is: {:?}", hello);
-
-        press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
-        println!("Res is: {:?}", res);
-
-        press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
-        println!("Res is: {:?}", res);
-
-        press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
-        println!("Res is: {:?}", res);
-
-        // press_to_continue().await;
-        // let res = client.sub(Request::new(SubRequest {})).await;
-        // println!("Res is: {:?}", res);
-        let req = TestSerdeJsonValueRequest {
-            value: serde_json::Value::Bool(true),
+        let service = MyServer {
+            ser_name: "test service".to_string(),
+            counter: Arc::new(Mutex::new(0u64)),
         };
-        let res = client.test_serde_json_value(Request::new(req)).await;
-        println!("Res is: {:?}", res);
+        let mut server = zrpc::prelude::Server::new(z);
+        server.add_service(Arc::new(HelloServer::new(service)));
+        server.serve().await;
     });
 
-    server.serve().await;
-    // todo!()
+    press_to_continue().await;
+
+    let hello = client
+        .hello(Request::new(HelloRequest {
+            name: "client".to_string(),
+        }))
+        .await;
+    println!("Res is: {:?}", hello);
+
+    press_to_continue().await;
+    let res = client.add(Request::new(AddRequest {})).await;
+    println!("Res is: {:?}", res);
+
+    press_to_continue().await;
+    let res = client.add(Request::new(AddRequest {})).await;
+    println!("Res is: {:?}", res);
+
+    press_to_continue().await;
+    let res = client.add(Request::new(AddRequest {})).await;
+    println!("Res is: {:?}", res);
+
+    // press_to_continue().await;
+    // let res = client.sub(Request::new(SubRequest {})).await;
+    // println!("Res is: {:?}", res);
+    let req = TestSerdeJsonValueRequest {
+        value: serde_json::Value::Bool(true),
+    };
+    let res = client.test_serde_json_value(Request::new(req)).await;
+    println!("Res is: {:?}", res);
 }
 
 async fn press_to_continue() {

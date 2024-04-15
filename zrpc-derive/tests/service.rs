@@ -31,7 +31,6 @@ struct MyServer {
     pub counter: Arc<Mutex<u64>>,
 }
 
-
 #[async_trait]
 impl Hello for MyServer {
     async fn hello(
@@ -120,7 +119,6 @@ fn service_discovery() {
 
     //     let _ = handle.await;
     // });
-    assert!(true)
 }
 
 #[test]
@@ -129,18 +127,15 @@ fn service_call() {
         let server_zid = ZenohId::rand();
         let client_zid = ZenohId::rand();
 
-        
-
         let client_config = configure_zenoh(
             client_zid,
             "tcp/127.0.0.1:9003".to_string(),
             "tcp/127.0.0.1:9002".to_string(),
         );
 
-       
         let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
 
-        let c_zid_server = server_zid.clone();
+        let c_zid_server = server_zid;
         async_std::task::spawn(async move {
             let server_config = configure_zenoh(
                 c_zid_server,
@@ -161,11 +156,9 @@ fn service_call() {
             server.serve().await;
         });
 
-
         // Check zenoh sessions are connected
-       
-        wait_for_peer(&client_session, server_zid).await;
 
+        wait_for_peer(&client_session, server_zid).await;
 
         //sleep 1s for KE propagation
         async_std::task::sleep(std::time::Duration::from_secs(2)).await;
@@ -173,17 +166,18 @@ fn service_call() {
         let client = HelloClient::new(client_session).await;
 
         let hello = client
-        .hello(Request::new(HelloRequest {
-            name: "client".to_string(),
-        }))
-        .await.unwrap();
+            .hello(Request::new(HelloRequest {
+                name: "client".to_string(),
+            }))
+            .await
+            .unwrap();
 
         assert_eq!(
             String::from("Hello client!, you are connected to test service"),
             hello.get_ref().0
         );
 
-        let res =client.add(Request::new(AddRequest {})).await.unwrap();
+        let res = client.add(Request::new(AddRequest {})).await.unwrap();
 
         assert_eq!(1, res.get_ref().0);
 
@@ -192,7 +186,6 @@ fn service_call() {
         let res = client.add(Request::new(AddRequest {})).await.unwrap();
 
         assert_eq!(3, res.get_ref().0);
-       
     });
 }
 
@@ -228,6 +221,4 @@ fn service_unavailable() {
     //     let empty: Vec<ZenohId> = vec![];
     //     assert_eq!(empty, servers);
     // });
-    assert!(true)
 }
-

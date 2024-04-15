@@ -19,7 +19,7 @@ use zenoh::prelude::QoSBuilderTrait;
 use zenoh::publication::PublisherPutBuilder;
 use zenoh::Result as ZResult;
 use zenoh::{
-    prelude::{sync::SyncResolve},
+    prelude::sync::SyncResolve,
     publication::{CongestionControl, Priority, Publisher, PublisherBuilder},
 };
 use zenoh_core::{AsyncResolve, Resolvable};

@@ -11,9 +11,9 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-use std::{collections::HashMap, sync::Arc};
 use async_std::sync::Mutex;
-use zenoh::key_expr::format::KeFormat;
+use std::{collections::HashMap, sync::Arc};
+// use zenoh::key_expr::format::KeFormat;
 use zenoh::liveliness::LivelinessToken;
 use zenoh::prelude::r#async::*;
 
@@ -27,7 +27,7 @@ use crate::types::{Message, WireMessage};
 pub struct Server {
     session: Arc<Session>,
     services: HashMap<String, Arc<dyn Service + Send + Sync>>,
-    tokens: Arc<Mutex<Vec<LivelinessToken<'static>>>>
+    tokens: Arc<Mutex<Vec<LivelinessToken<'static>>>>,
 }
 
 impl Server {
@@ -35,7 +35,7 @@ impl Server {
         Self {
             session,
             services: HashMap::new(),
-            tokens: Arc::new(Mutex::new(vec![]))
+            tokens: Arc::new(Mutex::new(vec![])),
         }
     }
 
@@ -88,8 +88,8 @@ impl Server {
             // let parsed = ke_format.parse(&selector.key_expr).unwrap();
 
             let service_name = Self::get_service_name(&selector.key_expr); //parsed.get("service_name").unwrap();
-            let method_name = Self::get_method_name(&selector.key_expr);//parsed.get("method_name").unwrap();
-            // println!("Calling {service_name}/{method_name}");
+            let method_name = Self::get_method_name(&selector.key_expr); //parsed.get("method_name").unwrap();
+                                                                         // println!("Calling {service_name}/{method_name}");
             let svc = self.services.get(service_name).unwrap();
 
             let payload: Vec<u8> = query.payload().unwrap().into();
@@ -125,17 +125,15 @@ impl Server {
         }
     }
 
-
-
     fn get_service_name<'a>(ke: &'a KeyExpr) -> &'a str {
-       Self::get_token(ke, 3)
+        Self::get_token(ke, 3)
     }
     fn get_method_name<'a>(ke: &'a KeyExpr) -> &'a str {
         Self::get_token(ke, 4)
-     }
+    }
 
     fn get_token<'a>(ke: &'a KeyExpr, index: usize) -> &'a str {
-        let tokens : Vec<_> = ke.split('/').collect();
+        let tokens: Vec<_> = ke.split('/').collect();
         tokens.get(index).unwrap()
     }
 }

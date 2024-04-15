@@ -22,8 +22,6 @@ use crate::{
     status::{Code, Status},
 };
 
-pub type BoxFuture<T, E> = std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'static>>;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WireMessage {
     pub(crate) payload: Option<Vec<u8>>,

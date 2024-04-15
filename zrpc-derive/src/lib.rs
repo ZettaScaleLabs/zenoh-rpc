@@ -264,6 +264,9 @@ impl<'a> ServiceGenerator<'a> {
                inner: std::sync::Arc<T>
             }
 
+            unsafe impl<T: #service_ident> Send for #server_ident<T> {}
+            unsafe impl<T: #service_ident> Sync for #server_ident<T> {}
+
             #[automatically_derived]
             impl<T> #server_ident<T>
             where
@@ -300,26 +303,23 @@ impl<'a> ServiceGenerator<'a> {
         quote! {
 
             #[automatically_derived]
+            #[async_trait::async_trait]
             impl<S> zrpc::prelude::Service for #server_ident<S>
-            where S: #service_ident +'static
+            where S: #service_ident + Send + Sync + 'static
             {
 
-                fn call(&self, req: zrpc::prelude::Message) -> zrpc::prelude::BoxFuture<zrpc::prelude::Message, zrpc::prelude::Status> {
+                async fn call(&self, req: zrpc::prelude::Message) -> std::result::Result<zrpc::prelude::Message, zrpc::prelude::Status> {
                     match req.method.as_str() {
                         #(
                                 #method_idents_str => {
                                 let req = zrpc::prelude::deserialize::<zrpc::prelude::Request<#request_idents>>(&req.body).unwrap();
-                                let inner = self.inner.clone();
-                                let fut = async move {
-                                    match inner.#method_idents(req).await {
-                                        Ok(resp) => Ok(resp.into()),
-                                        Err(s) => Err(s)
-                                    }
-                                };
-                                Box::pin(fut)
+                                match self.inner.#method_idents(req).await {
+                                    Ok(resp) => Ok(resp.into()),
+                                    Err(s) => Err(s)
+                                }
                             }
                         )*
-                        _ => Box::pin(async move { Err(zrpc::prelude::Status::new(zrpc::prelude::Code::Unvailable, "Unavailable")) }),
+                        _ => Err(zrpc::prelude::Status::new(zrpc::prelude::Code::Unvailable, "Unavailable")),
                     }
                 }
 

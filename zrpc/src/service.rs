@@ -12,11 +12,11 @@
 *********************************************************************************/
 
 use crate::status::Status;
-use crate::types::{BoxFuture, Message};
+use crate::types::Message;
 
-// #[async_trait::async_trait]
+#[async_trait::async_trait]
 pub trait Service {
-    fn call(&self, req: Message) -> BoxFuture<Message, Status>;
+    async fn call(&self, req: Message) -> Result<Message, Status>;
 
     fn name(&self) -> String;
 }

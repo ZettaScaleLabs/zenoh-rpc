@@ -31,5 +31,5 @@ pub mod prelude {
     pub use crate::server::Server;
     pub use crate::service::Service;
     pub use crate::status::{Code, Status};
-    pub use crate::types::{BoxFuture, Message};
+    pub use crate::types::Message;
 }

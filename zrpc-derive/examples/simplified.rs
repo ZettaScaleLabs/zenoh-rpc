@@ -25,12 +25,10 @@ use std::time::Duration;
 use zenoh::{Session, SessionDeclarations};
 
 use serde::{Deserialize, Serialize};
-
-use async_trait::async_trait;
 use zenoh::prelude::r#async::*;
 
 // this is the user defined trait
-#[async_trait]
+#[async_trait::async_trait]
 pub trait Hello {
     async fn hello(
         &self,
@@ -49,7 +47,7 @@ struct MyServer {
 
 // user code
 
-#[async_trait]
+#[async_trait::async_trait]
 impl Hello for MyServer {
     async fn hello(
         &self,
@@ -92,75 +90,42 @@ where
     }
 }
 
-unsafe impl<T:  Hello> Send for HelloServer<T> {}
+unsafe impl<T: Hello> Send for HelloServer<T> {}
 unsafe impl<T: Hello> Sync for HelloServer<T> {}
 
-// #[async_trait]
+#[async_trait::async_trait]
 impl<T> zrpc::prelude::Service for HelloServer<T>
 where
     T: Hello + Send + Sync + 'static,
 {
-    // type Response = Message;
-
-    // type Error = Status;
-
-    // type Future = BoxFuture<Self::Response, Self::Error>;
-
-    fn call(&self, req: Message) -> //Result<Message, Status> {
-        BoxFuture<Message, Status> {
-        // extract selector
-        // let selector = req.selector();
-        // // getting the query parameters
-        // let parameters = selector.parameters_cowmap().unwrap();
-
-        // // getting method name
-        // let method = parameters.get("method_name").unwrap().to_string();
-
+    async fn call(&self, req: Message) -> Result<Message, Status> {
         match req.method.as_str() {
             "hello" => {
-                // let raw_value: Vec<u8> = value.payload().into();
                 let req = zrpc::prelude::deserialize::<Request<HelloRequest>>(&req.body).unwrap();
-                let inner = self.inner.clone();
-                let fut = async move {
-                    match inner.hello(req).await {
-                        Ok(resp) => Ok(resp.into()),
-                        Err(s) => Err(s),
-                    }
-                };
-                Box::pin(fut)
-                // fut.await
+                match self.inner.hello(req).await {
+                    Ok(resp) => Ok(resp.into()),
+                    Err(s) => Err(s),
+                }
             }
             "add" => {
-                // let raw_value: Vec<u8> = value.payload().into();
                 let req = zrpc::prelude::deserialize::<Request<AddRequest>>(&req.body).unwrap();
-                let inner = self.inner.clone();
-                let fut = async move {
-                    match inner.add(req).await {
-                        Ok(resp) => Ok(resp.into()),
-                        Err(s) => Err(s),
-                    }
-                };
-                Box::pin(fut)
-                // fut.await
+                match self.inner.add(req).await {
+                    Ok(resp) => Ok(resp.into()),
+                    Err(s) => Err(s),
+                }
             }
             "sub" => {
-                // let raw_value: Vec<u8> = value.payload().into();
                 let req = zrpc::prelude::deserialize::<Request<SubRequest>>(&req.body).unwrap();
-                let inner = self.inner.clone();
-                let fut = async move {
-                    match inner.sub(req).await {
-                        Ok(resp) => Ok(resp.into()),
-                        Err(s) => Err(s),
-                    }
-                };
-                Box::pin(fut)
-                // fut.await
+                match self.inner.sub(req).await {
+                    Ok(resp) => Ok(resp.into()),
+                    Err(s) => Err(s),
+                }
             }
 
             _ => {
-                Box::pin(async move { Err(Status::new(Code::Unvailable, "Unavailable")) })
-                // Err(Status::new(Code::Unvailable, "Unavailable")) 
-            },
+                // Box::pin(async move { Err(Status::new(Code::Unvailable, "Unavailable")) })
+                Err(Status::new(Code::Unvailable, "Unavailable"))
+            }
         }
     }
 
