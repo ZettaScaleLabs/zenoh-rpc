@@ -26,7 +26,11 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    braced, parenthesized, parse::{Parse, ParseStream}, parse_macro_input, parse_quote, spanned::Spanned, Attribute, FnArg, Ident, Pat, PatType, Receiver, ReturnType, Token, Type, Visibility
+    braced, parenthesized,
+    parse::{Parse, ParseStream},
+    parse_macro_input, parse_quote,
+    spanned::Spanned,
+    Attribute, FnArg, Ident, Pat, PatType, Receiver, ReturnType, Token, Type, Visibility,
 };
 use syn_serde::json;
 
