@@ -191,34 +191,35 @@ fn service_call() {
 
 #[test]
 fn service_unavailable() {
-    // async_std::task::block_on(async {
-    //     let server_zid = ZenohId::rand();
-    //     let client_zid = ZenohId::rand();
+    async_std::task::block_on(async {
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
 
-    //     let server_config = configure_zenoh(
-    //         server_zid,
-    //         "tcp/127.0.0.1:9004".to_string(),
-    //         "tcp/127.0.0.1:9005".to_string(),
-    //     );
+        let server_config = configure_zenoh(
+            server_zid,
+            "tcp/127.0.0.1:9004".to_string(),
+            "tcp/127.0.0.1:9005".to_string(),
+        );
 
-    //     let client_config = configure_zenoh(
-    //         client_zid,
-    //         "tcp/127.0.0.1:9005".to_string(),
-    //         "tcp/127.0.0.1:9004".to_string(),
-    //     );
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9005".to_string(),
+            "tcp/127.0.0.1:9004".to_string(),
+        );
 
-    //     let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
-    //     let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
 
-    //     // Check zenoh sessions are connected
-    //     wait_for_peer(&server_session, client_zid).await;
-    //     wait_for_peer(&client_session, server_zid).await;
+        // Check zenoh sessions are connected
+        wait_for_peer(&server_session, client_zid).await;
+        wait_for_peer(&client_session, server_zid).await;
 
-    //     //sleep 1s for KE propagation
-    //     async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+        let client = HelloClient::new(client_session).await;
 
-    //     let servers = HelloClient::find_servers(client_session).await.unwrap();
-    //     let empty: Vec<ZenohId> = vec![];
-    //     assert_eq!(empty, servers);
-    // });
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+
+        let res = client.add(Request::new(AddRequest {})).await;
+        assert!(res.is_err())
+    });
 }

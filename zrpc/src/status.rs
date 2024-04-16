@@ -9,10 +9,13 @@ pub struct Status {
 }
 
 impl Status {
-    pub fn new(code: Code, message: &str) -> Self {
+    pub fn new<IntoString>(code: Code, message: IntoString) -> Self
+    where
+        IntoString: Into<String>,
+    {
         Self {
             code,
-            message: message.to_owned(),
+            message: message.into(),
             metadata: HashMap::new(),
         }
     }
@@ -32,5 +35,5 @@ pub enum Code {
     Timeout = 408,
     InternalError = 500,
     NotImplemented = 501,
-    Unvailable = 503,
+    Unavailable = 503,
 }

@@ -70,6 +70,17 @@ impl Server {
         loop {
             let query = queryable.recv_async().await.unwrap();
 
+            // the query for RPC is is in the format: @rpc/<server id>/service/<service-name>/<method-name>
+            // everything is sent as payload of the query
+            // in the future metadata and method name could be sent as attachments.
+
+            // for the PaaS we need to know which region the server is responsible of
+            // thus the idea is to add labels to the server, that can be used for querying the
+            // network when looking for servers
+            // the query in this case will be @rpc/<server-id>/metadata
+            // and the labels are sent as payload of the reply
+            // the caller then checks the metadata
+
             let svcs = self.services.clone();
             let c_ke = KeyExpr::try_from(ke.clone()).unwrap();
             async_std::task::spawn(async move {

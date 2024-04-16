@@ -320,7 +320,7 @@ impl<'a> ServiceGenerator<'a> {
                                 }
                             }
                         )*
-                        _ => Err(zrpc::prelude::Status::new(zrpc::prelude::Code::Unvailable, "Unavailable")),
+                        _ => Err(zrpc::prelude::Status::new(zrpc::prelude::Code::Unavailable, "Unavailable")),
                     }
                 }
 
@@ -428,7 +428,7 @@ impl<'a> ServiceGenerator<'a> {
 
                     #(#attrs)*
                     pub async fn #ident(#receiver, request: zrpc::prelude::Request<#request_ident>) ->  std::result::Result<zrpc::prelude::Response<#response_ident>, zrpc::prelude::Status> {
-                        self.ch.call_fun(self.find_server().await, request, #ident_str, self.tout).await.into()
+                        self.ch.call_fun(self.find_server().await?, request, #ident_str, self.tout).await.into()
                     }
                 }
             },
@@ -464,31 +464,69 @@ impl<'a> ServiceGenerator<'a> {
 
                     #(#fns)*
 
-                    async fn find_server(&self) -> zenoh::prelude::ZenohId {
+                    async fn find_server(&self) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
                         let res = self
                             .z
                             .liveliness()
                             .get(#rpc_ke)
                             .res()
                             .await
-                            .unwrap();
+                            .map_err(|e| {
+                                zrpc::prelude::Status::new(
+                                    zrpc::prelude::Code::Unavailable,
+                                    format!("Unable to perform liveliness query: {e:?}"),
+                                )
+                            })?;();
 
-                        let mut ids: Vec<zenoh::prelude::ZenohId> = res
+                            let mut ids = res
                             .into_iter()
-                            .map(|e| self.extract_id_from_ke(&e.sample.unwrap().key_expr))
-                            .collect();
-                        ids.pop().unwrap()
+                            .map(|e| {
+                                self.extract_id_from_ke(
+                                    &e.sample
+                                        .map_err(|_| {
+                                            zrpc::prelude::Status::new(
+                                                zrpc::prelude::Code::Unavailable,
+                                                format!("Cannot get value from sample"),
+                                            )
+                                        })?
+                                        .key_expr,
+                                )
+                            })
+                            .collect::<std::result::Result<std::vec::Vec<zenoh::prelude::ZenohId>, zrpc::prelude::Status>>()?;
+
+                        ids.pop()
+                            .ok_or(Status::new(Code::Unavailable, "No servers found"))
                     }
 
-                    fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> zenoh::prelude::ZenohId {
+                    fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
                         use std::str::FromStr;
-                        zenoh::prelude::ZenohId::from_str(
-                            self.ke_format
+                        let id_str = self
+                            .ke_format
                             .parse(ke)
-                            .unwrap()
+                            .map_err(|e| {
+                                zrpc::prelude::Status::new(
+                                    zrpc::prelude::Code::InternalError,
+                                    format!("Unable to parse key expression: {e:?}"),
+                                )
+                            })?
                             .get("zid")
-                            .unwrap().unwrap())
-                            .unwrap()
+                            .map_err(|e| {
+                                zrpc::prelude::Status::new(
+                                    zrpc::prelude::Code::InternalError,
+                                    format!("Unable to get server id from key expression: {e:?}"),
+                                )
+                            })?
+                            .ok_or(zrpc::prelude::Status::new(
+                                zrpc::prelude::Code::Unavailable,
+                                "Unable to get server id from key expression: Option is None",
+                            ))?;
+
+                        zenoh::prelude::ZenohId::from_str(id_str).map_err(|e| {
+                            zrpc::prelude::Status::new(
+                                zrpc::prelude::Code::InternalError,
+                                format!("Unable to convert str to ZenohId: {e:?}"),
+                            )
+                        })
                     }
             }
         }

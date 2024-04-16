@@ -123,8 +123,8 @@ where
             }
 
             _ => {
-                // Box::pin(async move { Err(Status::new(Code::Unvailable, "Unavailable")) })
-                Err(Status::new(Code::Unvailable, "Unavailable"))
+                // Box::pin(async move { Err(Status::new(Code::Unavailable, "Unavailable")) })
+                Err(Status::new(Code::Unavailable, "Unavailable"))
             }
         }
     }
@@ -195,51 +195,84 @@ impl<'a> HelloClient<'a> {
         request: Request<HelloRequest>,
     ) -> Result<Response<HelloResponse>, Status> {
         self.ch
-            .call_fun(self.find_server().await, request, "hello", self.tout)
+            .call_fun(self.find_server().await?, request, "hello", self.tout)
             .await
             .into()
     }
 
     pub async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
         self.ch
-            .call_fun(self.find_server().await, request, "add", self.tout)
+            .call_fun(self.find_server().await?, request, "add", self.tout)
             .await
             .into()
     }
 
     pub async fn sub(&self, request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
         self.ch
-            .call_fun(self.find_server().await, request, "sub", self.tout)
+            .call_fun(self.find_server().await?, request, "sub", self.tout)
             .await
             .into()
     }
 
-    async fn find_server(&self) -> ZenohId {
+    async fn find_server(&self) -> Result<ZenohId, Status> {
         let res = self
             .z
             .liveliness()
             .get("@rpc/*/service/Hello")
             .res()
             .await
-            .unwrap();
+            .map_err(|e| {
+                Status::new(
+                    Code::Unavailable,
+                    format!("Unable to perform liveliness query: {e:?}"),
+                )
+            })?;
 
-        let mut ids: Vec<ZenohId> = res
+        let mut ids = res
             .into_iter()
-            .map(|e| self.extract_id_from_ke(&e.sample.unwrap().key_expr))
-            .collect();
-        ids.pop().unwrap()
+            .map(|e| {
+                self.extract_id_from_ke(
+                    &e.sample
+                        .map_err(|_| {
+                            Status::new(Code::Unavailable, format!("Cannot get value from sample"))
+                        })?
+                        .key_expr,
+                )
+            })
+            .collect::<Result<Vec<ZenohId>, Status>>()?;
+
+        ids.pop()
+            .ok_or(Status::new(Code::Unavailable, "No servers found"))
     }
 
-    fn extract_id_from_ke(&self, ke: &KeyExpr) -> ZenohId {
-        ZenohId::from_str(
-            self.ke_format
-                .parse(ke)
-                .unwrap()
-                .get("zid")
-                .unwrap()
-                .unwrap(),
-        )
-        .unwrap()
+    fn extract_id_from_ke(&self, ke: &KeyExpr) -> Result<ZenohId, Status> {
+        let id_str = self
+            .ke_format
+            .parse(ke)
+            .map_err(|e| {
+                Status::new(
+                    Code::InternalError,
+                    format!("Unable to parse key expression: {e:?}"),
+                )
+            })?
+            .get("zid")
+            .map_err(|e| {
+                Status::new(
+                    Code::InternalError,
+                    format!("Unable to get server id from key expression: {e:?}"),
+                )
+            })?
+            .ok_or(Status::new(
+                Code::Unavailable,
+                "Unable to get server id from key expression: Option is None",
+            ))?;
+
+        ZenohId::from_str(id_str).map_err(|e| {
+            Status::new(
+                Code::InternalError,
+                format!("Unable to convert str to ZenohId: {e:?}"),
+            )
+        })
     }
 }
 
