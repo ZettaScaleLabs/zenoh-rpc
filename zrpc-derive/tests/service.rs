@@ -22,7 +22,7 @@ use zrpc_derive::service;
 #[service(timeout_s = 60)]
 pub trait Hello {
     async fn hello(&self, name: String) -> String;
-    async fn add(&mut self) -> u64;
+    async fn add(&self) -> u64;
 }
 
 #[derive(Clone)]

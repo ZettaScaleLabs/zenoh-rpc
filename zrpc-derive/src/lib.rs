@@ -21,18 +21,12 @@ extern crate quote;
 extern crate serde;
 extern crate syn;
 
-use darling::FromMeta;
+use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    braced, parenthesized,
-    parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote,
-    spanned::Spanned,
-    token::Comma,
-    Attribute, AttributeArgs, FnArg, Ident, Pat, PatType, Receiver, ReturnType, Token, Type,
-    Visibility,
+    braced, parenthesized, parse::{Parse, ParseStream}, parse_macro_input, parse_quote, spanned::Spanned, Attribute, FnArg, Ident, Pat, PatType, Receiver, ReturnType, Token, Type, Visibility
 };
 use syn_serde::json;
 
@@ -98,7 +92,8 @@ impl Parse for RPCMethod {
         parenthesized!(content in input);
         let mut args = Vec::new();
         let mut errors = Ok(());
-        for arg in content.parse_terminated::<FnArg, Comma>(FnArg::parse)? {
+
+        for arg in content.parse_terminated(FnArg::parse, Token![,])? {
             match arg {
                 FnArg::Typed(captured) if matches!(&*captured.pat, Pat::Ident(_)) => {
                     args.push(captured);
@@ -173,7 +168,9 @@ pub fn service(attr: TokenStream, input: TokenStream) -> TokenStream {
     } = parse_macro_input!(input as Service);
 
     //parsing the attributes to the macro
-    let attr_args = parse_macro_input!(attr as AttributeArgs);
+    // let attr_args = parse_macro_input!(attr as Meta);
+    let attr_args =
+        NestedMeta::parse_meta_list(attr.into()).expect("Cannot parse macro attributes");
     let macro_args = match ServiceMacroArgs::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => {
