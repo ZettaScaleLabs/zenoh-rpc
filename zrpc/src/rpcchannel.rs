@@ -115,7 +115,7 @@ impl RPCClientChannel {
                     log::error!("Unable to get sample from {e:?}");
                     RPCResult::Err(Status::new(
                         Code::InternalError,
-                        &format!("Unable to get sample from {e:?}"),
+                        format!("Unable to get sample from {e:?}"),
                     ))
                 }
             }
@@ -123,7 +123,7 @@ impl RPCClientChannel {
             log::error!("No data from server");
             RPCResult::Err(Status::new(
                 Code::InternalError,
-                &format!("No data from call_fun for Request {:?}", request),
+                format!("No data from call_fun for Request {:?}", request),
             ))
         }
     }

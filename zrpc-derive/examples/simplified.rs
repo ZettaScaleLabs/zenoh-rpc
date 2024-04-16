@@ -10,7 +10,6 @@
 * Contributors:
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
-
 use async_std::io::ReadExt;
 use async_std::sync::{Arc, Mutex};
 use async_std::task;
@@ -20,6 +19,7 @@ use zenoh::prelude::ZenohId;
 
 use zrpc::prelude::*;
 
+use std::ops::Deref;
 use std::str::{self, FromStr};
 use std::time::Duration;
 use zenoh::{Session, SessionDeclarations};
@@ -58,14 +58,14 @@ impl Hello for MyServer {
             request.get_ref().name,
             self.ser_name
         );
-        Ok(Response::new(HelloResponse { name }))
+        Ok(HelloResponse::from(name).into())
     }
 
     async fn add(&self, _request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
         let mut guard = self.counter.lock().await;
         *guard += 1;
         let value = *guard;
-        Ok(Response::new(AddResponse { value }))
+        Ok(AddResponse::from(value).into())
     }
 
     async fn sub(&self, _request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
@@ -142,28 +142,100 @@ pub struct HelloRequest {
     pub name: String,
 }
 
+impl From<HelloRequest> for Request<HelloRequest> {
+    fn from(value: HelloRequest) -> Self {
+        Request::new(value)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddRequest {}
 
+impl From<AddRequest> for Request<AddRequest> {
+    fn from(value: AddRequest) -> Self {
+        Request::new(value)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SubRequest {}
+
+impl From<SubRequest> for Request<SubRequest> {
+    fn from(value: SubRequest) -> Self {
+        Request::new(value)
+    }
+}
 
 /// The response sent over the wire from the server to the client.
 /// generated code
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HelloResponse {
-    pub name: String,
+pub struct HelloResponse(String);
+
+impl From<HelloResponse> for Response<HelloResponse> {
+    fn from(value: HelloResponse) -> Self {
+        Response::new(value)
+    }
+}
+
+impl From<String> for HelloResponse {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl Deref for HelloResponse {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AddResponse {
-    pub value: u64,
+pub struct AddResponse(u64);
+
+impl From<u64> for AddResponse {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AddResponse> for Response<AddResponse> {
+    fn from(value: AddResponse) -> Self {
+        Response::new(value)
+    }
+}
+
+impl Deref for AddResponse {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SubResponse {
-    pub value: u64,
+pub struct SubResponse(u64);
+
+impl From<u64> for SubResponse {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<SubResponse> for Response<SubResponse> {
+    fn from(value: SubResponse) -> Self {
+        Response::new(value)
+    }
+}
+
+impl Deref for SubResponse {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[allow(unused)]
@@ -190,26 +262,46 @@ impl<'a> HelloClient<'a> {
         }
     }
 
-    pub async fn hello(
+    pub async fn hello<IntoRequest>(
         &self,
-        request: Request<HelloRequest>,
-    ) -> Result<Response<HelloResponse>, Status> {
+        request: IntoRequest,
+    ) -> Result<Response<HelloResponse>, Status>
+    where
+        IntoRequest: Into<Request<HelloRequest>>,
+    {
         self.ch
-            .call_fun(self.find_server().await?, request, "hello", self.tout)
+            .call_fun(
+                self.find_server().await?,
+                request.into(),
+                "hello",
+                self.tout,
+            )
             .await
             .into()
     }
 
-    pub async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
+    pub async fn add<IntoRequest>(
+        &self,
+        request: IntoRequest,
+    ) -> Result<Response<AddResponse>, Status>
+    where
+        IntoRequest: Into<Request<AddRequest>>,
+    {
         self.ch
-            .call_fun(self.find_server().await?, request, "add", self.tout)
+            .call_fun(self.find_server().await?, request.into(), "add", self.tout)
             .await
             .into()
     }
 
-    pub async fn sub(&self, request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
+    pub async fn sub<IntoRequest>(
+        &self,
+        request: IntoRequest,
+    ) -> Result<Response<SubResponse>, Status>
+    where
+        IntoRequest: Into<Request<SubRequest>>,
+    {
         self.ch
-            .call_fun(self.find_server().await?, request, "sub", self.tout)
+            .call_fun(self.find_server().await?, request.into(), "sub", self.tout)
             .await
             .into()
     }
@@ -234,7 +326,7 @@ impl<'a> HelloClient<'a> {
                 self.extract_id_from_ke(
                     &e.sample
                         .map_err(|_| {
-                            Status::new(Code::Unavailable, format!("Cannot get value from sample"))
+                            Status::new(Code::Unavailable, "Cannot get value from sample")
                         })?
                         .key_expr,
                 )
@@ -305,26 +397,26 @@ async fn main() {
         press_to_continue().await;
 
         let hello = client
-            .hello(Request::new(HelloRequest {
+            .hello(HelloRequest {
                 name: "client".to_string(),
-            }))
+            })
             .await;
         println!("Res is: {:?}", hello);
 
         press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
+        let res = client.add(AddRequest {}).await;
         println!("Res is: {:?}", res);
 
         press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
+        let res = client.add(AddRequest {}).await;
         println!("Res is: {:?}", res);
 
         press_to_continue().await;
-        let res = client.add(Request::new(AddRequest {})).await;
+        let res = client.add(AddRequest {}).await;
         println!("Res is: {:?}", res);
 
         press_to_continue().await;
-        let res = client.sub(Request::new(SubRequest {})).await;
+        let res = client.sub(SubRequest {}).await;
         println!("Res is: {:?}", res);
     }
 }

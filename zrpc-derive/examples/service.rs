@@ -51,7 +51,7 @@ impl Hello for MyServer {
         let mut guard = self.counter.lock().await;
         *guard += 1;
         let res = *guard;
-        Ok(Response::new(res.into()))
+        Ok(AddResponse::from(res).into())
     }
 
     async fn test_serde_json_value(
@@ -100,15 +100,15 @@ async fn main() {
     println!("Res is: {:?}", hello);
 
     press_to_continue().await;
-    let res = client.add(Request::new(AddRequest {})).await;
+    let res = client.add(AddRequest {}).await;
     println!("Res is: {:?}", res);
 
     press_to_continue().await;
-    let res = client.add(Request::new(AddRequest {})).await;
+    let res = client.add(AddRequest {}).await;
     println!("Res is: {:?}", res);
 
     press_to_continue().await;
-    let res = client.add(Request::new(AddRequest {})).await;
+    let res = client.add(AddRequest {}).await;
     println!("Res is: {:?}", res);
 
     // press_to_continue().await;

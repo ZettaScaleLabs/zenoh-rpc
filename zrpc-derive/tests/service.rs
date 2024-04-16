@@ -174,18 +174,18 @@ fn service_call() {
 
         assert_eq!(
             String::from("Hello client!, you are connected to test service"),
-            hello.get_ref().0
+            **hello.get_ref()
         );
 
         let res = client.add(Request::new(AddRequest {})).await.unwrap();
 
-        assert_eq!(1, res.get_ref().0);
+        assert_eq!(1, **res.get_ref());
 
         client.add(Request::new(AddRequest {})).await.unwrap();
 
         let res = client.add(Request::new(AddRequest {})).await.unwrap();
 
-        assert_eq!(3, res.get_ref().0);
+        assert_eq!(3, **res.get_ref());
     });
 }
 

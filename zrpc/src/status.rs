@@ -19,6 +19,14 @@ impl Status {
             metadata: HashMap::new(),
         }
     }
+
+    pub fn code(&self) -> &Code {
+        &self.code
+    }
+
+    pub fn message(&self) -> &String {
+        &self.message
+    }
 }
 
 /// Zenoh-RPC status codes

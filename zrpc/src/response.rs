@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// maybe convert to trait and put metadata in the generated types
+
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
 pub struct Response<T>

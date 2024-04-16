@@ -348,6 +348,13 @@ impl<'a> ServiceGenerator<'a> {
                 pub struct #ident {
                     #( pub #args ),*
                 }
+
+                #[automatically_derived]
+                impl std::convert::From<#ident> for zrpc::prelude::Request<#ident> {
+                    fn from(value: #ident) -> Self {
+                        zrpc::prelude::Request::new(value)
+                    }
+                }
             };
 
             types.push(tokens);
@@ -382,6 +389,22 @@ impl<'a> ServiceGenerator<'a> {
                 impl std::convert::From<#output> for #ident {
                     fn from(value: #output) -> Self {
                         Self(value)
+                    }
+                }
+
+                #[automatically_derived]
+                impl std::convert::Into<zrpc::prelude::Response<#ident>> for #ident {
+                    fn into(self) -> zrpc::prelude::Response<#ident> {
+                        Response::new(self)
+                    }
+                }
+
+                #[automatically_derived]
+                impl std::ops::Deref for #ident {
+                    type Target = #output;
+
+                    fn deref(&self) -> &Self::Target {
+                        &self.0
                     }
                 }
             };
@@ -427,8 +450,14 @@ impl<'a> ServiceGenerator<'a> {
                 quote! {
 
                     #(#attrs)*
-                    pub async fn #ident(#receiver, request: zrpc::prelude::Request<#request_ident>) ->  std::result::Result<zrpc::prelude::Response<#response_ident>, zrpc::prelude::Status> {
-                        self.ch.call_fun(self.find_server().await?, request, #ident_str, self.tout).await.into()
+                    pub async fn #ident<IntoRequest>(
+                        #receiver,
+                        request: IntoRequest,
+                    )->  std::result::Result<zrpc::prelude::Response<#response_ident>, zrpc::prelude::Status>
+                    where
+                        IntoRequest: std::convert::Into<zrpc::prelude::Request<#request_ident>>
+                    {
+                        self.ch.call_fun(self.find_server().await?, request.into(), #ident_str, self.tout).await.into()
                     }
                 }
             },
