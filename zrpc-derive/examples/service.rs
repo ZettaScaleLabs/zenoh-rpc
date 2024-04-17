@@ -11,10 +11,11 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-use async_std::io::ReadExt;
-use async_std::sync::{Arc, Mutex};
-use async_std::task;
 use async_trait::async_trait;
+use std::sync::Arc;
+use tokio::io::AsyncReadExt;
+use tokio::sync::Mutex;
+use tokio::task;
 use zrpc::prelude::*;
 
 use std::str;
@@ -66,7 +67,7 @@ impl Hello for MyServer {
     }
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     env_logger::init();
     use zenoh::prelude::r#async::*;
@@ -125,5 +126,5 @@ async fn main() {
 async fn press_to_continue() {
     println!("Press ENTER to continue...");
     let buffer = &mut [0u8];
-    async_std::io::stdin().read_exact(buffer).await.unwrap();
+    tokio::io::stdin().read_exact(buffer).await.unwrap();
 }

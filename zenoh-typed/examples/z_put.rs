@@ -11,7 +11,7 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
-use async_std::task::sleep;
+use tokio::time::sleep;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -26,7 +26,8 @@ struct MyData {
     pub id: u64,
 }
 
-#[async_std::main]
+
+#[tokio::main]
 async fn main() {
     // Initiate logging
     env_logger::init();

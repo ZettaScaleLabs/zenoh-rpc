@@ -24,7 +24,7 @@ struct MyData {
     pub id: u64,
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     // Initiate logging
     env_logger::init();

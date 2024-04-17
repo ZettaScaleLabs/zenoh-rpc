@@ -13,7 +13,6 @@ version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = { workspace = true }
 base64 = { workspace = true }
 bincode = { workspace = true, optional = true }
 flume = { workspace = true }
@@ -23,6 +22,7 @@ serde = { workspace = true }
 serde_cbor = { workspace = true }
 serde_derive = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["io-std","io-util", "rt-multi-thread"]}
 zenoh = { workspace = true }
 zenoh-codec = { workspace = true }
 zenoh-core = { workspace = true }

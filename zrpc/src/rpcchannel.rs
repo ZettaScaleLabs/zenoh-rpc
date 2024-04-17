@@ -16,10 +16,10 @@ extern crate serde;
 
 use std::time::Duration;
 
-use async_std::sync::Arc;
 use flume::Receiver;
 use log::trace;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use zenoh::prelude::r#async::*;
 use zenoh::query::*;
 use zenoh::Session;

@@ -38,7 +38,6 @@ panic = "abort"
 
 [workspace.dependencies]
 Inflector = "0.11"
-async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1.79"
 base64 = "0.22.0"
 bincode = { version = "1.3.3" }
@@ -58,10 +57,15 @@ serde_yaml = { version = "0.9" }
 syn = { version = "2.0", features = ["full", "visit-mut"] }
 syn-serde = { version = "0.3", features = ["json"] }
 thiserror = "1.0"
+tokio = { version = "1.35.1", default-features = false, features = [
+  "macros",
+  "rt",
+  "time",
+] }
 zenoh = { version = "0.10.1-rc", default-features = false }
-zenoh-codec = {  version = "0.10.1-rc" }
-zenoh-core = {  version = "0.10.1-rc" }
-zenoh-ext = {  version = "0.10.1-rc" }
-zenoh-macros = {  version = "0.10.1-rc" }
-zenoh-protocol = {  version = "0.10.1-rc" }
-zenoh-util = {  version = "0.10.1-rc" }
+zenoh-codec = { version = "0.10.1-rc" }
+zenoh-core = { version = "0.10.1-rc" }
+zenoh-ext = { version = "0.10.1-rc" }
+zenoh-macros = { version = "0.10.1-rc" }
+zenoh-protocol = { version = "0.10.1-rc" }
+zenoh-util = { version = "0.10.1-rc" }

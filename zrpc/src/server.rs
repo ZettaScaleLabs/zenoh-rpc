@@ -11,9 +11,9 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-use async_std::sync::Mutex;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 use zenoh::liveliness::LivelinessToken;
 use zenoh::prelude::r#async::*;
 
@@ -169,7 +169,7 @@ impl Server {
             };
             // This could easility become a task pool with a channel where the futures
             // are submitted fox execution
-            async_std::task::spawn(async move {
+            tokio::task::spawn(async move {
                 let res = fut.await;
                 let sample = match res {
                     Ok(data) => Sample::new(ke, data),

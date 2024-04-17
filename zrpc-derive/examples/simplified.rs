@@ -10,11 +10,10 @@
 * Contributors:
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
-use async_std::io::ReadExt;
-use async_std::sync::{Arc, Mutex};
-use async_std::task;
+use std::sync::Arc;
+use tokio::io::AsyncReadExt;
+use tokio::sync::Mutex;
 use zenoh::key_expr::format::KeFormat;
-
 use zenoh::prelude::ZenohId;
 
 use zrpc::prelude::*;
@@ -400,7 +399,7 @@ impl<'a> HelloClient<'a> {
     }
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     {
         env_logger::init();
@@ -414,7 +413,7 @@ async fn main() {
 
         let z = zsession.clone();
 
-        task::spawn(async move {
+        tokio::task::spawn(async move {
             let service = MyServer {
                 ser_name: "test service".to_string(),
                 counter: Arc::new(Mutex::new(0u64)),
@@ -457,5 +456,5 @@ async fn main() {
 async fn press_to_continue() {
     println!("Press ENTER to continue...");
     let buffer = &mut [0u8];
-    async_std::io::stdin().read_exact(buffer).await.unwrap();
+    tokio::io::stdin().read_exact(buffer).await.unwrap();
 }
