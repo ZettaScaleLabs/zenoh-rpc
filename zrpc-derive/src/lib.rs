@@ -559,7 +559,7 @@ impl<'a> ServiceGenerator<'a> {
 
                     let metadatas = self.ch.get_servers_metadata(&ids, self.tout).await?;
 
-                    let mut ids: Vec<ZenohId> = metadatas
+                    let mut ids: Vec<zenoh::prelude::ZenohId> = metadatas
                     .into_iter()
                     .filter(|m| m.labels.is_superset(&self.labels))
                     .map(|m| m.id)
