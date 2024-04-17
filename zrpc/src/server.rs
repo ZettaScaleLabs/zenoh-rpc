@@ -132,9 +132,10 @@ impl Server {
         self.tokens.lock().await.extend(tokens);
 
         loop {
-            let query = queryable.recv_async().await.map_err(|e| {
-                Status::new(Code::InternalError, format!("Cannot receive query: {e:?}"))
-            })?;
+            let query = queryable
+                .recv_async()
+                .await
+                .map_err(|e| Status::internal_error(format!("Cannot receive query: {e:?}")))?;
 
             // the query for RPC is is in the format: @rpc/<server id>/service/<service-name>/<method-name>
             // everything is sent as payload of the query
@@ -207,12 +208,11 @@ impl Server {
                 log::trace!("Service response: {msg:?}");
                 let wmsg = WireMessage {
                     payload: Some(msg.body),
-                    status: Status::new(Code::Ok, ""),
+                    status: Status::ok(""),
                 };
 
-                serialize(&wmsg).map_err(|e| {
-                    Status::new(Code::InternalError, format!("Serialization error: {e:?}"))
-                })
+                serialize(&wmsg)
+                    .map_err(|e| Status::internal_error(format!("Serialization error: {e:?}")))
             }
             Err(e) => {
                 log::trace!("Service error is : {e:?}");
@@ -220,9 +220,8 @@ impl Server {
                     payload: None,
                     status: e,
                 };
-                serialize(&wmsg).map_err(|e| {
-                    Status::new(Code::InternalError, format!("Serialization error: {e:?}"))
-                })
+                serialize(&wmsg)
+                    .map_err(|e| Status::internal_error(format!("Serialization error: {e:?}")))
             }
         }
     }
@@ -230,26 +229,25 @@ impl Server {
     async fn server_metadata(labels: HashSet<String>, id: ZenohId) -> Result<Vec<u8>, Status> {
         let metadata = ServerMetadata { labels, id };
         let serialized_metadata = serialize(&metadata)
-            .map_err(|e| Status::new(Code::InternalError, format!("Serialization error: {e:?}")))?;
+            .map_err(|e| Status::internal_error(format!("Serialization error: {e:?}")))?;
 
         let wmsg = WireMessage {
             payload: Some(serialized_metadata),
-            status: Status::new(Code::Ok, ""),
+            status: Status::ok(""),
         };
 
-        serialize(&wmsg)
-            .map_err(|e| Status::new(Code::InternalError, format!("Serialization error: {e:?}")))
+        serialize(&wmsg).map_err(|e| Status::internal_error(format!("Serialization error: {e:?}")))
     }
 
     async fn create_error() -> Result<Vec<u8>, Status> {
-        Err(Status::new(Code::Unavailable, "Unavailable"))
+        Err(Status::unavailable("Unavailable"))
     }
 
     fn get_service_name<'a>(ke: &'a KeyExpr) -> Result<&'a str, Status> {
-        Self::get_token(ke, 3).ok_or(Status::new(Code::InternalError, "Cannot get service name"))
+        Self::get_token(ke, 3).ok_or(Status::internal_error("Cannot get service name"))
     }
     fn get_method_name<'a>(ke: &'a KeyExpr) -> Result<&'a str, Status> {
-        Self::get_token(ke, 4).ok_or(Status::new(Code::InternalError, "Cannot get method name"))
+        Self::get_token(ke, 4).ok_or(Status::internal_error("Cannot get method name"))
     }
 
     fn get_token<'a>(ke: &'a KeyExpr, index: usize) -> Option<&'a str> {

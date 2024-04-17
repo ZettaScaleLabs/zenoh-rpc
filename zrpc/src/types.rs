@@ -11,12 +11,7 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-use crate::{
-    request::Request,
-    response::Response,
-    serialize::serialize,
-    status::{Code, Status},
-};
+use crate::{request::Request, response::Response, serialize::serialize, status::Status};
 use futures::Future;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -79,7 +74,7 @@ where
             method: "".into(),
             body: serialize(value.get_ref()).unwrap(),
             metadata: value.get_metadata().clone(),
-            status: Status::new(Code::Ok, ""),
+            status: Status::ok(""),
         }
     }
 }
@@ -94,7 +89,7 @@ where
             method: "".into(),
             body: serialize(value.get_ref()).unwrap(),
             metadata: value.get_metadata().clone(),
-            status: Status::new(Code::Ok, ""),
+            status: Status::ok(""),
         }
     }
 }

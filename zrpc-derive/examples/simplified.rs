@@ -70,7 +70,7 @@ impl Hello for MyServer {
     }
 
     async fn sub(&self, _request: Request<SubRequest>) -> Result<Response<SubResponse>, Status> {
-        Err(Status::new(Code::NotImplemented, "Not yet!"))
+        Err(Status::not_implemented("Not yet!"))
     }
 }
 
@@ -124,8 +124,8 @@ where
             }
 
             _ => {
-                // Box::pin(async move { Err(Status::new(Code::Unavailable, "Unavailable")) })
-                Err(Status::new(Code::Unavailable, "Unavailable"))
+                // Box::pin(async move { Err(Status::unavailable "Unavailable")) })
+                Err(Status::unavailable("Unavailable"))
             }
         }
     }
@@ -353,10 +353,7 @@ impl<'a> HelloClient<'a> {
             .res()
             .await
             .map_err(|e| {
-                Status::new(
-                    Code::Unavailable,
-                    format!("Unable to perform liveliness query: {e:?}"),
-                )
+                Status::unavailable(format!("Unable to perform liveliness query: {e:?}"))
             })?;
 
         let ids = res
@@ -364,9 +361,7 @@ impl<'a> HelloClient<'a> {
             .map(|e| {
                 self.extract_id_from_ke(
                     &e.sample
-                        .map_err(|_| {
-                            Status::new(Code::Unavailable, "Cannot get value from sample")
-                        })?
+                        .map_err(|_| Status::unavailable("Cannot get value from sample"))?
                         .key_expr,
                 )
             })
@@ -382,38 +377,26 @@ impl<'a> HelloClient<'a> {
             .map(|m| m.id)
             .collect();
 
-        ids.pop()
-            .ok_or(Status::new(Code::Unavailable, "No servers found"))
+        ids.pop().ok_or(Status::unavailable("No servers found"))
     }
 
     fn extract_id_from_ke(&self, ke: &KeyExpr) -> Result<ZenohId, Status> {
         let id_str = self
             .ke_format
             .parse(ke)
-            .map_err(|e| {
-                Status::new(
-                    Code::InternalError,
-                    format!("Unable to parse key expression: {e:?}"),
-                )
-            })?
+            .map_err(|e| Status::internal_error(format!("Unable to parse key expression: {e:?}")))?
             .get("zid")
             .map_err(|e| {
-                Status::new(
-                    Code::InternalError,
-                    format!("Unable to get server id from key expression: {e:?}"),
-                )
+                Status::internal_error(format!(
+                    "Unable to get server id from key expression: {e:?}"
+                ))
             })?
-            .ok_or(Status::new(
-                Code::Unavailable,
+            .ok_or(Status::unavailable(
                 "Unable to get server id from key expression: Option is None",
             ))?;
 
-        ZenohId::from_str(id_str).map_err(|e| {
-            Status::new(
-                Code::InternalError,
-                format!("Unable to convert str to ZenohId: {e:?}"),
-            )
-        })
+        ZenohId::from_str(id_str)
+            .map_err(|e| Status::internal_error(format!("Unable to convert str to ZenohId: {e:?}")))
     }
 }
 
