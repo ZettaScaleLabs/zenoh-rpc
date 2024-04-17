@@ -11,16 +11,22 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
-
 use crate::{
     request::Request,
     response::Response,
     serialize::serialize,
     status::{Code, Status},
 };
+use futures::Future;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    pin::Pin,
+};
+use zenoh::config::ZenohId;
+
+pub(crate) type ServerTaskFuture =
+    Pin<Box<dyn Future<Output = Result<Vec<u8>, Status>> + Send + 'static>>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WireMessage {
@@ -91,4 +97,10 @@ where
             status: Status::new(Code::Ok, ""),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ServerMetadata {
+    pub labels: HashSet<String>,
+    pub id: ZenohId,
 }

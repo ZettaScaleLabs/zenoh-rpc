@@ -19,6 +19,7 @@ use zenoh::prelude::ZenohId;
 
 use zrpc::prelude::*;
 
+use std::collections::HashSet;
 use std::ops::Deref;
 use std::str::{self, FromStr};
 use std::time::Duration;
@@ -238,27 +239,66 @@ impl Deref for SubResponse {
     }
 }
 
+pub struct HelloClientBuilder<'a> {
+    pub z: Arc<Session>,
+    pub labels: HashSet<String>,
+    ke_format: KeFormat<'a>,
+    pub tout: Duration,
+}
+
+impl<'a> HelloClientBuilder<'a> {
+    pub fn add_label<IntoString>(mut self, label: IntoString) -> Self
+    where
+        IntoString: Into<String>,
+    {
+        self.labels.insert(label.into());
+        self
+    }
+
+    pub fn labels<IterIntoString, IntoString>(mut self, labels: IterIntoString) -> Self
+    where
+        IntoString: Into<String>,
+        IterIntoString: Iterator<Item = IntoString>,
+    {
+        self.labels.extend(labels.map(|e| e.into()));
+        self
+    }
+
+    pub fn timeout(mut self, tout: Duration) -> Self {
+        self.tout = tout;
+        self
+    }
+
+    pub fn build(self) -> HelloClient<'a> {
+        HelloClient {
+            ch: RPCClientChannel::new(self.z.clone(), "Hello"),
+            ke_format: self.ke_format,
+            z: self.z,
+            tout: self.tout,
+            labels: self.labels,
+        }
+    }
+}
+
 #[allow(unused)]
 #[derive(Clone, Debug)]
 pub struct HelloClient<'a> {
-    ch: RPCClientChannel,
-    ke_format: KeFormat<'a>,
-    z: Arc<Session>,
-    tout: Duration,
+    pub(crate) ch: RPCClientChannel,
+    pub(crate) ke_format: KeFormat<'a>,
+    pub(crate) z: Arc<Session>,
+    pub(crate) tout: Duration,
+    pub(crate) labels: HashSet<String>,
 }
 
 // generated client code
 
 impl<'a> HelloClient<'a> {
-    pub async fn new(z: async_std::sync::Arc<zenoh::Session>) -> HelloClient<'a> {
-        let new_client = RPCClientChannel::new(z.clone(), "Hello".into());
-        let tout = std::time::Duration::from_secs(60u16 as u64);
-        let ke_format = KeFormat::new("@rpc/${zid:*}/service/Hello").unwrap();
-        HelloClient {
-            ch: new_client,
-            ke_format,
+    pub fn builder(z: Arc<zenoh::Session>) -> HelloClientBuilder<'a> {
+        HelloClientBuilder {
             z,
-            tout,
+            labels: HashSet::new(),
+            ke_format: KeFormat::new("@rpc/${zid:*}/service/Hello").unwrap(),
+            tout: std::time::Duration::from_secs(60u16 as u64),
         }
     }
 
@@ -277,7 +317,6 @@ impl<'a> HelloClient<'a> {
                 self.tout,
             )
             .await
-            .into()
     }
 
     pub async fn add<IntoRequest>(
@@ -290,7 +329,6 @@ impl<'a> HelloClient<'a> {
         self.ch
             .call_fun(self.find_server().await?, request.into(), "add", self.tout)
             .await
-            .into()
     }
 
     pub async fn sub<IntoRequest>(
@@ -303,9 +341,10 @@ impl<'a> HelloClient<'a> {
         self.ch
             .call_fun(self.find_server().await?, request.into(), "sub", self.tout)
             .await
-            .into()
     }
 
+    // this could be improved by caching the server id
+    // maybe by using this https://github.com/moka-rs/moka
     async fn find_server(&self) -> Result<ZenohId, Status> {
         let res = self
             .z
@@ -320,7 +359,7 @@ impl<'a> HelloClient<'a> {
                 )
             })?;
 
-        let mut ids = res
+        let ids = res
             .into_iter()
             .map(|e| {
                 self.extract_id_from_ke(
@@ -332,6 +371,16 @@ impl<'a> HelloClient<'a> {
                 )
             })
             .collect::<Result<Vec<ZenohId>, Status>>()?;
+
+        // get server metadata
+        let metadatas = self.ch.get_servers_metadata(&ids, self.tout).await?;
+
+        // filter the metadata based on labels
+        let mut ids: Vec<ZenohId> = metadatas
+            .into_iter()
+            .filter(|m| m.labels.is_superset(&self.labels))
+            .map(|m| m.id)
+            .collect();
 
         ids.pop()
             .ok_or(Status::new(Code::Unavailable, "No servers found"))
@@ -387,12 +436,13 @@ async fn main() {
                 ser_name: "test service".to_string(),
                 counter: Arc::new(Mutex::new(0u64)),
             };
-            let mut server = zrpc::prelude::Server::new(z);
-            server.add_service(Arc::new(HelloServer::new(service)));
-            server.serve().await;
+            let builder =
+                zrpc::prelude::Server::builder(z).add_service(Arc::new(HelloServer::new(service)));
+
+            let _ = builder.build().serve().await;
         });
 
-        let client = HelloClient::new(zsession).await;
+        let client = HelloClient::builder(zsession).build();
 
         press_to_continue().await;
 

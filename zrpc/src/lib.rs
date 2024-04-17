@@ -14,7 +14,6 @@
 
 mod request;
 mod response;
-mod result;
 mod rpcchannel;
 mod serialize;
 mod server;

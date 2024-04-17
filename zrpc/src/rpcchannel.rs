@@ -26,10 +26,10 @@ use zenoh::Session;
 
 use crate::request::Request;
 use crate::response::Response;
-use crate::result::RPCResult;
 use crate::serialize::{deserialize, serialize};
 use crate::status::Code;
 use crate::status::Status;
+use crate::types::ServerMetadata;
 use crate::types::WireMessage;
 use crate::zrpcresult::ZRPCResult;
 
@@ -40,8 +40,14 @@ pub struct RPCClientChannel {
 }
 
 impl RPCClientChannel {
-    pub fn new(z: Arc<Session>, service_name: String) -> RPCClientChannel {
-        RPCClientChannel { z, service_name }
+    pub fn new<IntoString>(z: Arc<Session>, service_name: IntoString) -> RPCClientChannel
+    where
+        IntoString: Into<String>,
+    {
+        RPCClientChannel {
+            z,
+            service_name: service_name.into(),
+        }
     }
 
     /// This functions calls the get on the workspace for the eval
@@ -83,14 +89,17 @@ impl RPCClientChannel {
         request: Request<T>,
         method: &str,
         tout: Duration,
-    ) -> RPCResult<U>
+    ) -> Result<Response<U>, Status>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
         U: Serialize + Clone + std::fmt::Debug,
         for<'de3> U: Deserialize<'de3>,
     {
-        let data_receiver = self.send(server_id, &request, method, tout).await.unwrap();
+        let data_receiver = self
+            .send(server_id, &request, method, tout)
+            .await
+            .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
         //takes only one, eval goes to only one
         let reply = data_receiver.recv_async().await;
         log::trace!("Response from zenoh is {:?}", reply);
@@ -98,22 +107,25 @@ impl RPCClientChannel {
             match reply.sample {
                 Ok(sample) => {
                     let raw_data: Vec<u8> = sample.payload.contiguous().to_vec();
-                    let wmsg: WireMessage = deserialize(&raw_data).unwrap();
+
+                    let wmsg: WireMessage = deserialize(&raw_data).map_err(|e| {
+                        Status::new(Code::InternalError, format!("deserialization error: {e:?}"))
+                    })?;
                     // println!("Wire MSG is {:?}", wmsg);
                     match wmsg.payload {
                         Some(raw_data) => match deserialize::<U>(&raw_data) {
                             Ok(r) => {
                                 // println!("Data is {:?}", r);
-                                RPCResult::Ok(Response::new(r))
+                                Ok(Response::new(r))
                             }
-                            Err(_) => RPCResult::Err(wmsg.status),
+                            Err(_) => Err(wmsg.status),
                         },
-                        None => RPCResult::Err(wmsg.status),
+                        None => Err(wmsg.status),
                     }
                 }
                 Err(e) => {
                     log::error!("Unable to get sample from {e:?}");
-                    RPCResult::Err(Status::new(
+                    Err(Status::new(
                         Code::InternalError,
                         format!("Unable to get sample from {e:?}"),
                     ))
@@ -121,10 +133,45 @@ impl RPCClientChannel {
             }
         } else {
             log::error!("No data from server");
-            RPCResult::Err(Status::new(
+            Err(Status::new(
                 Code::InternalError,
                 format!("No data from call_fun for Request {:?}", request),
             ))
         }
+    }
+
+    pub async fn get_servers_metadata(
+        &self,
+        ids: &[ZenohId],
+        tout: Duration,
+    ) -> Result<Vec<ServerMetadata>, Status> {
+        let ke = "@rpc/*/metadata".to_string();
+        let data = self
+            .z
+            .get(ke)
+            .target(QueryTarget::All)
+            .timeout(tout)
+            .res()
+            .await
+            .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
+
+        let metadata = data
+            .into_iter()
+            // getting only reply with Sample::Ok
+            .filter_map(|r| r.sample.ok())
+            // getting only the ones we can deserialize
+            .filter_map(|s| {
+                let raw_data = s.payload.contiguous().to_vec();
+                deserialize::<WireMessage>(&raw_data).ok()
+            })
+            // get only the ones that do not have errors
+            .filter_map(|wmgs| wmgs.payload)
+            // get the ones where we can actually deserialize the payload
+            .filter_map(|pl| deserialize::<ServerMetadata>(&pl).ok())
+            // filter by the IDs providing the needed service
+            .filter(|m| ids.contains(&m.id))
+            .collect();
+
+        Ok(metadata)
     }
 }

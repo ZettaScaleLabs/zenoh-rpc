@@ -429,6 +429,7 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         let client_ident = format_ident!("{}Client", service_ident);
+        let client_builder_ident = format_ident!("{}ClientBuilder", service_ident);
         let service_ident_str = service_ident.to_string();
         let rpc_ke = format!("@rpc/*/service/{service_ident_str}");
         let ke_fmt = "@rpc/${zid:*}/service/";
@@ -457,106 +458,155 @@ impl<'a> ServiceGenerator<'a> {
                     where
                         IntoRequest: std::convert::Into<zrpc::prelude::Request<#request_ident>>
                     {
-                        self.ch.call_fun(self.find_server().await?, request.into(), #ident_str, self.tout).await.into()
+                        self.ch.call_fun(self.find_server().await?, request.into(), #ident_str, self.tout).await
                     }
                 }
             },
         );
 
         quote! {
+            #[automatically_derived]
+            #vis struct #client_builder_ident<'a> {
+                pub(crate) z: std::sync::Arc<zenoh::Session>,
+                ke_format: zenoh::key_expr::format::KeFormat<'a>,
+                pub(crate) tout: std::time::Duration,
+                pub(crate) labels: std::collections::HashSet<std::string::String>,
+            }
 
+            #[automatically_derived]
+            impl<'a> #client_builder_ident<'a> {
+                pub fn add_label<IntoString>(mut self, label: IntoString) -> Self
+                where
+                    IntoString: std::convert::Into<std::string::String>,
+                {
+                    self.labels.insert(label.into());
+                    self
+                }
+
+                pub fn labels<IterIntoString, IntoString>(mut self, labels: IterIntoString) -> Self
+                where
+                    IntoString: std::convert::Into<std::string::String>,
+                    IterIntoString: std::iter::Iterator<Item = IntoString>,
+                {
+                    self.labels.extend(labels.map(|e| e.into()));
+                    self
+                }
+
+                pub fn timeout(mut self, tout: std::time::Duration) -> Self {
+                    self.tout = tout;
+                    self
+                }
+
+                pub fn build(self) -> #client_ident<'a> {
+                    #client_ident {
+                        ch: zrpc::prelude::RPCClientChannel::new(self.z.clone(), #service_ident_str),
+                        ke_format: self.ke_format,
+                        z: self.z,
+                        tout: self.tout,
+                        labels: self.labels,
+                    }
+                }
+            }
+
+            #[automatically_derived]
             #[allow(unused)]
             #[derive(Clone, Debug)]
             #vis struct #client_ident<'a> {
-                ch : zrpc::prelude::RPCClientChannel,
-                z: Arc<zenoh::Session>,
-                ke_format: zenoh::key_expr::format::KeFormat<'a>,
-                tout: std::time::Duration,
+                pub(crate) ch : zrpc::prelude::RPCClientChannel,
+                pub(crate) z: std::sync::Arc<zenoh::Session>,
+                pub(crate) ke_format: zenoh::key_expr::format::KeFormat<'a>,
+                pub(crate) tout: std::time::Duration,
+                pub(crate) labels: std::collections::HashSet<std::string::String>,
             }
 
+            #[automatically_derived]
             impl<'a> #client_ident<'a> {
-                #vis async fn new(
-                    z : async_std::sync::Arc<zenoh::Session>,
-                ) -> #client_ident<'a> {
-                        let new_client = zrpc::prelude::RPCClientChannel::new(z.clone(), #service_ident_str.to_string());
-                        let ke_format = zenoh::key_expr::format::KeFormat::new(#format_str).unwrap();
-                        let tout = std::time::Duration::from_secs(#tout as u64);
-                        #client_ident{
-                            ch : new_client,
-                            z,
-                            ke_format,
-                            tout,
-                        }
 
+
+                #vis fn builder(z: std::sync::Arc<zenoh::Session>) -> #client_builder_ident<'a> {
+                    #client_builder_ident {
+                        z,
+                        labels: std::collections::HashSet::new(),
+                        ke_format: zenoh::key_expr::format::KeFormat::new(#format_str).unwrap(),
+                        tout: std::time::Duration::from_secs(#tout as u64),
                     }
+                }
 
 
-                    #(#fns)*
+                #(#fns)*
 
-                    async fn find_server(&self) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
-                        let res = self
-                            .z
-                            .liveliness()
-                            .get(#rpc_ke)
-                            .res()
-                            .await
-                            .map_err(|e| {
-                                zrpc::prelude::Status::new(
-                                    zrpc::prelude::Code::Unavailable,
-                                    format!("Unable to perform liveliness query: {e:?}"),
-                                )
-                            })?;();
-
-                            let mut ids = res
-                            .into_iter()
-                            .map(|e| {
-                                self.extract_id_from_ke(
-                                    &e.sample
-                                        .map_err(|_| {
-                                            zrpc::prelude::Status::new(
-                                                zrpc::prelude::Code::Unavailable,
-                                                format!("Cannot get value from sample"),
-                                            )
-                                        })?
-                                        .key_expr,
-                                )
-                            })
-                            .collect::<std::result::Result<std::vec::Vec<zenoh::prelude::ZenohId>, zrpc::prelude::Status>>()?;
-
-                        ids.pop()
-                            .ok_or(Status::new(Code::Unavailable, "No servers found"))
-                    }
-
-                    fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
-                        use std::str::FromStr;
-                        let id_str = self
-                            .ke_format
-                            .parse(ke)
-                            .map_err(|e| {
-                                zrpc::prelude::Status::new(
-                                    zrpc::prelude::Code::InternalError,
-                                    format!("Unable to parse key expression: {e:?}"),
-                                )
-                            })?
-                            .get("zid")
-                            .map_err(|e| {
-                                zrpc::prelude::Status::new(
-                                    zrpc::prelude::Code::InternalError,
-                                    format!("Unable to get server id from key expression: {e:?}"),
-                                )
-                            })?
-                            .ok_or(zrpc::prelude::Status::new(
-                                zrpc::prelude::Code::Unavailable,
-                                "Unable to get server id from key expression: Option is None",
-                            ))?;
-
-                        zenoh::prelude::ZenohId::from_str(id_str).map_err(|e| {
+                async fn find_server(&self) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
+                    let res = self
+                        .z
+                        .liveliness()
+                        .get(#rpc_ke)
+                        .res()
+                        .await
+                        .map_err(|e| {
                             zrpc::prelude::Status::new(
-                                zrpc::prelude::Code::InternalError,
-                                format!("Unable to convert str to ZenohId: {e:?}"),
+                                zrpc::prelude::Code::Unavailable,
+                                format!("Unable to perform liveliness query: {e:?}"),
+                            )
+                        })?;();
+
+                        let ids = res
+                        .into_iter()
+                        .map(|e| {
+                            self.extract_id_from_ke(
+                                &e.sample
+                                    .map_err(|_| {
+                                        zrpc::prelude::Status::new(
+                                            zrpc::prelude::Code::Unavailable,
+                                            format!("Cannot get value from sample"),
+                                        )
+                                    })?
+                                    .key_expr,
                             )
                         })
-                    }
+                        .collect::<std::result::Result<std::vec::Vec<zenoh::prelude::ZenohId>, zrpc::prelude::Status>>()?;
+
+                    let metadatas = self.ch.get_servers_metadata(&ids, self.tout).await?;
+
+                    let mut ids: Vec<ZenohId> = metadatas
+                    .into_iter()
+                    .filter(|m| m.labels.is_superset(&self.labels))
+                    .map(|m| m.id)
+                    .collect();
+
+                    ids.pop()
+                        .ok_or(Status::new(Code::Unavailable, "No servers found"))
+                }
+
+                fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
+                    use std::str::FromStr;
+                    let id_str = self
+                        .ke_format
+                        .parse(ke)
+                        .map_err(|e| {
+                            zrpc::prelude::Status::new(
+                                zrpc::prelude::Code::InternalError,
+                                format!("Unable to parse key expression: {e:?}"),
+                            )
+                        })?
+                        .get("zid")
+                        .map_err(|e| {
+                            zrpc::prelude::Status::new(
+                                zrpc::prelude::Code::InternalError,
+                                format!("Unable to get server id from key expression: {e:?}"),
+                            )
+                        })?
+                        .ok_or(zrpc::prelude::Status::new(
+                            zrpc::prelude::Code::Unavailable,
+                            "Unable to get server id from key expression: Option is None",
+                        ))?;
+
+                    zenoh::prelude::ZenohId::from_str(id_str).map_err(|e| {
+                        zrpc::prelude::Status::new(
+                            zrpc::prelude::Code::InternalError,
+                            format!("Unable to convert str to ZenohId: {e:?}"),
+                        )
+                    })
+                }
             }
         }
     }

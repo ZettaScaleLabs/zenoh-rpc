@@ -78,16 +78,17 @@ async fn main() {
     let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
 
     let z = zsession.clone();
-    let client = HelloClient::new(zsession).await;
+    let client = HelloClient::builder(zsession).build();
 
     task::spawn(async move {
         let service = MyServer {
             ser_name: "test service".to_string(),
             counter: Arc::new(Mutex::new(0u64)),
         };
-        let mut server = zrpc::prelude::Server::new(z);
-        server.add_service(Arc::new(HelloServer::new(service)));
-        server.serve().await;
+        let builder =
+            zrpc::prelude::Server::builder(z).add_service(Arc::new(HelloServer::new(service)));
+
+        let _ = builder.build().serve().await;
     });
 
     press_to_continue().await;

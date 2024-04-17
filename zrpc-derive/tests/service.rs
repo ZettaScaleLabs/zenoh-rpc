@@ -149,11 +149,10 @@ fn service_call() {
                 ser_name: "test service".to_string(),
                 counter: Arc::new(Mutex::new(0u64)),
             };
+            let builder = zrpc::prelude::Server::builder(server_session)
+                .add_service(Arc::new(HelloServer::new(service)));
 
-            let mut server = Server::new(server_session);
-            server.add_service(Arc::new(HelloServer::new(service)));
-
-            server.serve().await;
+            let _ = builder.build().serve().await;
         });
 
         // Check zenoh sessions are connected
@@ -163,7 +162,7 @@ fn service_call() {
         //sleep 1s for KE propagation
         async_std::task::sleep(std::time::Duration::from_secs(2)).await;
 
-        let client = HelloClient::new(client_session).await;
+        let client = HelloClient::builder(client_session).build();
 
         let hello = client
             .hello(Request::new(HelloRequest {
@@ -214,12 +213,114 @@ fn service_unavailable() {
         wait_for_peer(&server_session, client_zid).await;
         wait_for_peer(&client_session, server_zid).await;
 
-        let client = HelloClient::new(client_session).await;
-
+        let client = HelloClient::builder(client_session).build();
         //sleep 1s for KE propagation
         async_std::task::sleep(std::time::Duration::from_secs(1)).await;
 
         let res = client.add(Request::new(AddRequest {})).await;
         assert!(res.is_err())
+    });
+}
+
+#[test]
+fn server_not_matching() {
+    async_std::task::block_on(async {
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
+
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9007".to_string(),
+            "tcp/127.0.0.1:9006".to_string(),
+        );
+
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+
+        let c_zid_server = server_zid;
+        async_std::task::spawn(async move {
+            let server_config = configure_zenoh(
+                c_zid_server,
+                "tcp/127.0.0.1:9006".to_string(),
+                "tcp/127.0.0.1:9007".to_string(),
+            );
+            let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+            wait_for_peer(&server_session, client_zid).await;
+
+            let service = MyServer {
+                ser_name: "test service".to_string(),
+                counter: Arc::new(Mutex::new(0u64)),
+            };
+            let builder = zrpc::prelude::Server::builder(server_session)
+                .add_label("test-1")
+                .add_service(Arc::new(HelloServer::new(service)));
+
+            let _ = builder.build().serve().await;
+        });
+
+        // Check zenoh sessions are connected
+
+        wait_for_peer(&client_session, server_zid).await;
+
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(2)).await;
+
+        let client = HelloClient::builder(client_session)
+            .add_label("test-2")
+            .build();
+
+        let res = client.add(Request::new(AddRequest {})).await;
+        assert!(res.is_err())
+    });
+}
+
+#[test]
+fn server_matching() {
+    async_std::task::block_on(async {
+        let server_zid = ZenohId::rand();
+        let client_zid = ZenohId::rand();
+
+        let client_config = configure_zenoh(
+            client_zid,
+            "tcp/127.0.0.1:9009".to_string(),
+            "tcp/127.0.0.1:9008".to_string(),
+        );
+
+        let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+
+        let c_zid_server = server_zid;
+        async_std::task::spawn(async move {
+            let server_config = configure_zenoh(
+                c_zid_server,
+                "tcp/127.0.0.1:9008".to_string(),
+                "tcp/127.0.0.1:9007".to_string(),
+            );
+            let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+            wait_for_peer(&server_session, client_zid).await;
+
+            let service = MyServer {
+                ser_name: "test service".to_string(),
+                counter: Arc::new(Mutex::new(0u64)),
+            };
+            let builder = zrpc::prelude::Server::builder(server_session)
+                .add_label("test-1")
+                .add_label("test-2")
+                .add_service(Arc::new(HelloServer::new(service)));
+
+            let _ = builder.build().serve().await;
+        });
+
+        // Check zenoh sessions are connected
+
+        wait_for_peer(&client_session, server_zid).await;
+
+        //sleep 1s for KE propagation
+        async_std::task::sleep(std::time::Duration::from_secs(2)).await;
+
+        let client = HelloClient::builder(client_session)
+            .add_label("test-2")
+            .build();
+
+        let res = client.add(Request::new(AddRequest {})).await;
+        assert!(res.is_ok())
     });
 }
