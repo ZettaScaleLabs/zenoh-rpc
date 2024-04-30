@@ -20,7 +20,7 @@ use zrpc::prelude::*;
 
 use std::str;
 
-use zenoh::prelude::r#async::*;
+
 use zrpc_derive::service;
 
 #[service(timeout_s = 60)]

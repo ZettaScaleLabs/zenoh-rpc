@@ -537,6 +537,8 @@ impl<'a> ServiceGenerator<'a> {
 
                 async fn find_server(&self) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
                     use zenoh::prelude::r#async::AsyncResolve;
+                    use zenoh::SessionDeclarations;
+
                     let res = self
                         .z
                         .liveliness()
