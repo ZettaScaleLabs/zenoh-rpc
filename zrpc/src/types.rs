@@ -72,7 +72,7 @@ where
     fn from(value: Response<T>) -> Self {
         Self {
             method: "".into(),
-            body: serialize(value.get_ref()).unwrap(),
+            body: serialize(value.get_ref()).unwrap_or_default(),
             metadata: value.get_metadata().clone(),
             status: Status::ok(""),
         }
@@ -87,7 +87,7 @@ where
     fn from(value: Request<T>) -> Self {
         Self {
             method: "".into(),
-            body: serialize(value.get_ref()).unwrap(),
+            body: serialize(value.get_ref()).unwrap_or_default(),
             metadata: value.get_metadata().clone(),
             status: Status::ok(""),
         }

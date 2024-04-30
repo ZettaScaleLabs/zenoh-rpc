@@ -152,9 +152,24 @@ impl Server {
 
             let fut: ServerTaskFuture = match Self::get_token(&ke, 2) {
                 Some("service") => {
-                    let service_name = Self::get_service_name(&ke).unwrap();
-                    let svc = self.services.get(service_name).unwrap().clone();
-                    let payload = query.value().unwrap().payload.contiguous().to_vec();
+                    let service_name = Self::get_service_name(&ke)?;
+                    let svc = self
+                        .services
+                        .get(service_name)
+                        .ok_or_else(|| {
+                            Status::internal_error(format!("Service not found: {service_name}"))
+                        })?
+                        .clone();
+
+                    let payload = query
+                        .value()
+                        .ok_or_else(|| {
+                            Status::internal_error("Query has empty value cannot proceed")
+                        })?
+                        .payload
+                        .contiguous()
+                        .to_vec();
+
                     // this is call to a service
                     Box::pin(Self::service_call(svc, ke.clone(), payload))
                 }
