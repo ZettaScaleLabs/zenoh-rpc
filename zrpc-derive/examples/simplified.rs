@@ -389,10 +389,7 @@ impl<'a> HelloClient<'a> {
                 Status::internal_error(format!(
                     "Unable to get server id from key expression: {e:?}"
                 ))
-            })?
-            .ok_or(Status::unavailable(
-                "Unable to get server id from key expression: Option is None",
-            ))?;
+            })?;
 
         ZenohId::from_str(id_str)
             .map_err(|e| Status::internal_error(format!("Unable to convert str to ZenohId: {e:?}")))

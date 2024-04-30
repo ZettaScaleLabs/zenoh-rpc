@@ -577,8 +577,7 @@ impl<'a> ServiceGenerator<'a> {
                         .parse(ke)
                         .map_err(|e| zrpc::prelude::Status::internal_error(format!("Unable to parse key expression: {e:?}")))?
                         .get("zid")
-                        .map_err(|e|  zrpc::prelude::Status::internal_error(format!("Unable to get server id from key expression: {e:?}")))?
-                        .ok_or(zrpc::prelude::Status::unavailable( "Unable to get server id from key expression: Option is None"))?;
+                        .map_err(|e|  zrpc::prelude::Status::internal_error(format!("Unable to get server id from key expression: {e:?}")))?;
 
                     zenoh::prelude::ZenohId::from_str(id_str)
                     .map_err(|e| zrpc::prelude::Status::internal_error(format!("Unable to convert str to ZenohId: {e:?}")))
