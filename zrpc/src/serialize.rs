@@ -39,9 +39,9 @@ where
 }
 
 #[cfg(feature = "resp_json")]
-pub fn serialize<T: ?Sized>(data: &T) -> ZRPCResult<Vec<u8>>
+pub fn serialize<T>(data: &T) -> ZRPCResult<Vec<u8>>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
 {
     Ok(serde_json::to_string(data)?.into_bytes())
 }
