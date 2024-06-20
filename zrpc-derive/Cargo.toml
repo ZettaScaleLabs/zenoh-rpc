@@ -1,0 +1,38 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "zrpc-derive"
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# To build with debug on macros: RUSTFLAGS="-Z macro-backtrace"
+
+[dependencies]
+Inflector = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+darling = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+syn = { workspace = true }
+syn-serde = { workspace = true }
+tokio = { workspace = true, features = ["io-std","io-util", "rt-multi-thread"]}
+zenoh = { workspace = true }
+zenoh-util = { workspace = true }
+zrpc = { version = "0.8.0-alpha.1", path = "../zrpc" }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+proc-macro = true

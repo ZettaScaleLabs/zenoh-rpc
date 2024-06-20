@@ -122,16 +122,16 @@ impl From<base64::DecodeError> for ZRPCError {
     }
 }
 
-impl From<async_std::channel::RecvError> for ZRPCError {
-    fn from(err: async_std::channel::RecvError) -> Self {
-        ZRPCError::ChannelError(err.to_string())
-    }
-}
+// impl From<::channel::RecvError> for ZRPCError {
+//     fn from(err: async_std::channel::RecvError) -> Self {
+//         ZRPCError::ChannelError(err.to_string())
+//     }
+// }
 
-impl<T> From<async_std::channel::SendError<T>> for ZRPCError {
-    fn from(err: async_std::channel::SendError<T>) -> Self {
-        ZRPCError::ChannelError(err.to_string())
-    }
-}
+// impl<T> From<async_std::channel::SendError<T>> for ZRPCError {
+//     fn from(err: async_std::channel::SendError<T>) -> Self {
+//         ZRPCError::ChannelError(err.to_string())
+//     }
+// }
 
 pub type ZRPCResult<T> = Result<T, ZRPCError>;

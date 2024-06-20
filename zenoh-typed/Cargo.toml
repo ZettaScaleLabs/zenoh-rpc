@@ -5,28 +5,34 @@ description.workspace = true
 edition.workspace = true
 homepage.workspace = true
 license.workspace = true
-name = "zrpc"
+name = "zenoh-typed"
 readme.workspace = true
 repository.workspace = true
 version.workspace = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = { workspace = true }
 base64 = { workspace = true }
 bincode = { workspace = true, optional = true }
 flume = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
-serde_cbor = { workspace = true, optional = true }
+serde_cbor = { workspace = true }
 serde_derive = { workspace = true }
-serde_json = { workspace = true, optional = true }
-serde_yaml = { workspace = true, optional = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["io-std","io-util", "rt-multi-thread"]}
 zenoh = { workspace = true }
+zenoh-codec = { workspace = true }
+zenoh-core = { workspace = true }
+zenoh-macros = { workspace = true }
+zenoh-protocol = { workspace = true }
 zenoh-util = { workspace = true }
+
+[dev-dependencies]
+clap = { workspace = true }
+env_logger = { workspace = true }
 
 [features]
 #zenoh feature re-exports
@@ -43,28 +49,4 @@ transport_ws = ["zenoh/transport_ws"]
 
 query_payload = ["zenoh/unstable"]
 
-resp_bincode = ["bincode"]
-send_bincode = ["bincode"]
-
-resp_json = ["serde_json"]
-send_json = ["serde_json"]
-
-resp_cbor = ["serde_cbor"]
-send_cbor = ["serde_cbor"]
-
-state_bincode = ["bincode"]
-state_cbor = ["serde_cbor"]
-state_json = ["serde_json"]
-
-router_json = ["serde_json"]
-
-default = [
-  "query_payload",
-  "resp_json",
-  "router_json",
-  "send_json",
-  "state_json",
-  "transport_tcp",
-  "transport_udp",
-  "zenoh/unstable",
-]
+default = ["query_payload", "transport_tcp", "transport_udp"]

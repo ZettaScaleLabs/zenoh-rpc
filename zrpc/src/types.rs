@@ -11,49 +11,91 @@
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
 
-extern crate serde;
-
-#[cfg(feature = "send_json")]
-extern crate serde_json;
-//extern crate serde_yaml;
-
+use crate::{request::Request, response::Response, serialize::serialize, status::Status};
+use futures::Future;
 use serde::{Deserialize, Serialize};
-use zenoh::prelude::ZenohId;
+use std::{
+    collections::{HashMap, HashSet},
+    pin::Pin,
+};
+use zenoh::config::ZenohId;
 
-#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ComponentStatus {
-    HALTED = 0,
-    INITIALIZING = 1,
-    REGISTERED = 2,
-    SERVING = 3,
+pub(crate) type ServerTaskFuture =
+    Pin<Box<dyn Future<Output = Result<Vec<u8>, Status>> + Send + 'static>>;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WireMessage {
+    pub(crate) payload: Option<Vec<u8>>,
+    pub(crate) status: Status,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ComponentState {
-    pub uuid: ZenohId,
-    pub name: String,
-    pub routerid: String,
-    pub peerid: String,
-    pub status: ComponentStatus,
+#[derive(Debug)]
+pub struct Message {
+    pub method: String,
+    pub body: Vec<u8>,
+    pub metadata: HashMap<String, String>,
+    pub status: Status,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZSessionInfo {
-    pub peer: String,
-    pub links: Vec<String>,
+impl Message {
+    pub fn from_parts(
+        method: String,
+        body: Vec<u8>,
+        metadata: HashMap<String, String>,
+        status: Status,
+    ) -> Self {
+        Self {
+            method,
+            body,
+            metadata,
+            status,
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZPluginInfo {
-    pub name: String,
-    pub path: String,
+impl From<Status> for Message {
+    fn from(value: Status) -> Self {
+        Self {
+            method: "".into(),
+            body: vec![],
+            metadata: HashMap::new(),
+            status: value,
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZRouterInfo {
-    pub pid: String,
-    pub locators: Vec<String>,
-    pub sessions: Vec<ZSessionInfo>,
-    pub plugins: Vec<ZPluginInfo>,
-    pub time: Option<String>,
+impl<T> From<Response<T>> for Message
+where
+    T: Serialize + Clone + std::fmt::Debug,
+    for<'de2> T: Deserialize<'de2>,
+{
+    fn from(value: Response<T>) -> Self {
+        Self {
+            method: "".into(),
+            body: serialize(value.get_ref()).unwrap_or_default(),
+            metadata: value.get_metadata().clone(),
+            status: Status::ok(""),
+        }
+    }
+}
+
+impl<T> From<Request<T>> for Message
+where
+    T: Serialize + Clone + std::fmt::Debug,
+    for<'de2> T: Deserialize<'de2>,
+{
+    fn from(value: Request<T>) -> Self {
+        Self {
+            method: "".into(),
+            body: serialize(value.get_ref()).unwrap_or_default(),
+            metadata: value.get_metadata().clone(),
+            status: Status::ok(""),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ServerMetadata {
+    pub labels: HashSet<String>,
+    pub id: ZenohId,
 }

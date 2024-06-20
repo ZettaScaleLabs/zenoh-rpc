@@ -10,25 +10,13 @@
 * Contributors:
 *   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 *********************************************************************************/
-#![allow(clippy::upper_case_acronyms)]
 
-mod request;
-mod response;
-mod rpcchannel;
-mod serialize;
-mod server;
-mod service;
-mod status;
-mod types;
-mod zrpcresult;
+use crate::status::Status;
+use crate::types::Message;
 
-pub mod prelude {
-    pub use crate::request::Request;
-    pub use crate::response::Response;
-    pub use crate::rpcchannel::RPCClientChannel;
-    pub use crate::serialize::{deserialize, serialize};
-    pub use crate::server::Server;
-    pub use crate::service::Service;
-    pub use crate::status::{Code, Status};
-    pub use crate::types::Message;
+#[async_trait::async_trait]
+pub trait Service {
+    async fn call(&self, req: Message) -> Result<Message, Status>;
+
+    fn name(&self) -> String;
 }
