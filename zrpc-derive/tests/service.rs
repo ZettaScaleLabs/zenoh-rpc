@@ -15,7 +15,10 @@ use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 use async_trait::async_trait;
-use zenoh::{config::{EndPoint, ZenohId}, session::SessionDeclarations};
+use zenoh::{
+    config::{EndPoint, ZenohId},
+    session::SessionDeclarations,
+};
 //importing the macros
 use zrpc::prelude::*;
 use zrpc_derive::service;
@@ -60,8 +63,8 @@ fn configure_zenoh(id: ZenohId, listen: String, connect: String) -> zenoh::confi
         .unwrap();
     config.scouting.multicast.set_enabled(Some(false)).unwrap();
 
-    let listen : Vec<EndPoint> = vec![listen.parse().unwrap()];
-    let connect : Vec<EndPoint> = vec![connect.parse().unwrap()];
+    let listen: Vec<EndPoint> = vec![listen.parse().unwrap()];
+    let connect: Vec<EndPoint> = vec![connect.parse().unwrap()];
     config.listen.endpoints.set(listen).unwrap();
     config.connect.endpoints.set(connect).unwrap();
 
@@ -141,8 +144,8 @@ async fn service_call() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn service_unavailable() {
-    let server_zid =  ZenohId::from_str("a2").unwrap();
-    let client_zid =  ZenohId::from_str("a3").unwrap();
+    let server_zid = ZenohId::from_str("a2").unwrap();
+    let client_zid = ZenohId::from_str("a3").unwrap();
 
     let server_config = configure_zenoh(
         server_zid,
@@ -174,7 +177,7 @@ async fn service_unavailable() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn server_not_matching() {
     let server_zid = ZenohId::from_str("a4").unwrap();
-    let client_zid =  ZenohId::from_str("a5").unwrap();
+    let client_zid = ZenohId::from_str("a5").unwrap();
 
     let client_config = configure_zenoh(
         client_zid,
@@ -223,8 +226,8 @@ async fn server_not_matching() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn server_matching() {
-    let server_zid =  ZenohId::from_str("a6").unwrap();
-    let client_zid =  ZenohId::from_str("a7").unwrap();
+    let server_zid = ZenohId::from_str("a6").unwrap();
+    let client_zid = ZenohId::from_str("a7").unwrap();
 
     let client_config = configure_zenoh(
         client_zid,
