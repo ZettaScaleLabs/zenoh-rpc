@@ -11,12 +11,12 @@
 *   ADLINK fog05 team, <fog05@adlink-labs.tech>
 *********************************************************************************/
 
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 use async_trait::async_trait;
+use zenoh::{config::{EndPoint, ZenohId}, session::SessionDeclarations};
 //importing the macros
-use zenoh::prelude::r#async::*;
 use zrpc::prelude::*;
 use zrpc_derive::service;
 
@@ -59,22 +59,25 @@ fn configure_zenoh(id: ZenohId, listen: String, connect: String) -> zenoh::confi
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
     config.scouting.multicast.set_enabled(Some(false)).unwrap();
-    config.listen.endpoints.push(listen.parse().unwrap());
-    config.connect.endpoints.push(connect.parse().unwrap());
+
+    let listen : Vec<EndPoint> = vec![listen.parse().unwrap()];
+    let connect : Vec<EndPoint> = vec![connect.parse().unwrap()];
+    config.listen.endpoints.set(listen).unwrap();
+    config.connect.endpoints.set(connect).unwrap();
 
     config
 }
 
 async fn wait_for_peer(session: &zenoh::Session, id: ZenohId) {
-    while !session.info().peers_zid().res().await.any(|e| e == id) {
+    while !session.info().peers_zid().await.any(|e| e == id) {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn service_call() {
-    let server_zid = ZenohId::rand();
-    let client_zid = ZenohId::rand();
+    let server_zid = ZenohId::from_str("a0").unwrap();
+    let client_zid = ZenohId::from_str("a1").unwrap();
 
     let client_config = configure_zenoh(
         client_zid,
@@ -82,7 +85,7 @@ async fn service_call() {
         "tcp/127.0.0.1:9002".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
 
     let c_zid_server = server_zid;
     tokio::task::spawn(async move {
@@ -91,7 +94,7 @@ async fn service_call() {
             "tcp/127.0.0.1:9002".to_string(),
             "tcp/127.0.0.1:9003".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {
@@ -138,8 +141,8 @@ async fn service_call() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn service_unavailable() {
-    let server_zid = ZenohId::rand();
-    let client_zid = ZenohId::rand();
+    let server_zid =  ZenohId::from_str("a2").unwrap();
+    let client_zid =  ZenohId::from_str("a3").unwrap();
 
     let server_config = configure_zenoh(
         server_zid,
@@ -153,8 +156,8 @@ async fn service_unavailable() {
         "tcp/127.0.0.1:9004".to_string(),
     );
 
-    let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
-    let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+    let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
+    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
 
     // Check zenoh sessions are connected
     wait_for_peer(&server_session, client_zid).await;
@@ -170,8 +173,8 @@ async fn service_unavailable() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn server_not_matching() {
-    let server_zid = ZenohId::rand();
-    let client_zid = ZenohId::rand();
+    let server_zid = ZenohId::from_str("a4").unwrap();
+    let client_zid =  ZenohId::from_str("a5").unwrap();
 
     let client_config = configure_zenoh(
         client_zid,
@@ -179,7 +182,7 @@ async fn server_not_matching() {
         "tcp/127.0.0.1:9006".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
 
     let c_zid_server = server_zid;
     let st = tokio::task::spawn(async move {
@@ -188,7 +191,7 @@ async fn server_not_matching() {
             "tcp/127.0.0.1:9006".to_string(),
             "tcp/127.0.0.1:9007".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {
@@ -220,8 +223,8 @@ async fn server_not_matching() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn server_matching() {
-    let server_zid = ZenohId::rand();
-    let client_zid = ZenohId::rand();
+    let server_zid =  ZenohId::from_str("a6").unwrap();
+    let client_zid =  ZenohId::from_str("a7").unwrap();
 
     let client_config = configure_zenoh(
         client_zid,
@@ -229,7 +232,7 @@ async fn server_matching() {
         "tcp/127.0.0.1:9008".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).res().await.unwrap());
+    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
 
     let c_zid_server = server_zid;
     tokio::task::spawn(async move {
@@ -238,7 +241,7 @@ async fn server_matching() {
             "tcp/127.0.0.1:9008".to_string(),
             "tcp/127.0.0.1:9009".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).res().await.unwrap());
+        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {

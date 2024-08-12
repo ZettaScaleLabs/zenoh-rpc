@@ -535,15 +535,13 @@ impl<'a> ServiceGenerator<'a> {
 
                 #(#fns)*
 
-                async fn find_server(&self) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
-                    use zenoh::prelude::r#async::AsyncResolve;
-                    use zenoh::SessionDeclarations;
+                async fn find_server(&self) -> std::result::Result<zenoh::config::ZenohId, zrpc::prelude::Status> {
+                    use zenoh::session::SessionDeclarations;
 
                     let res = self
                         .z
                         .liveliness()
                         .get(#rpc_ke)
-                        .res()
                         .await
                         .map_err(|e| {
                             zrpc::prelude::Status::unavailable(format!("Unable to perform liveliness query: {e:?}"))
@@ -551,18 +549,17 @@ impl<'a> ServiceGenerator<'a> {
 
                         let ids = res
                         .into_iter()
+                        .filter_map(|e| e.into_result().ok())
                         .map(|e| {
                             self.extract_id_from_ke(
-                                &e.sample
-                                    .map_err(|_|  zrpc::prelude::Status::unavailable("Cannot get value from sample"))?
-                                    .key_expr,
+                                e.key_expr()
                             )
                         })
-                        .collect::<std::result::Result<std::vec::Vec<zenoh::prelude::ZenohId>, zrpc::prelude::Status>>()?;
+                        .collect::<std::result::Result<std::vec::Vec<zenoh::config::ZenohId>, zrpc::prelude::Status>>()?;
 
                     let metadatas = self.ch.get_servers_metadata(&ids, self.tout).await?;
 
-                    let mut ids: Vec<zenoh::prelude::ZenohId> = metadatas
+                    let mut ids: Vec<zenoh::config::ZenohId> = metadatas
                     .into_iter()
                     .filter(|m| m.labels.is_superset(&self.labels))
                     .map(|m| m.id)
@@ -572,7 +569,7 @@ impl<'a> ServiceGenerator<'a> {
                         .ok_or(zrpc::prelude::Status::unavailable("No servers found"))
                 }
 
-                fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> std::result::Result<zenoh::prelude::ZenohId, zrpc::prelude::Status> {
+                fn extract_id_from_ke(&self, ke: &zenoh::key_expr::KeyExpr) -> std::result::Result<zenoh::config::ZenohId, zrpc::prelude::Status> {
                     use std::str::FromStr;
                     let id_str = self
                         .ke_format
@@ -581,7 +578,7 @@ impl<'a> ServiceGenerator<'a> {
                         .get("zid")
                         .map_err(|e|  zrpc::prelude::Status::internal_error(format!("Unable to get server id from key expression: {e:?}")))?;
 
-                    zenoh::prelude::ZenohId::from_str(id_str)
+                    zenoh::config::ZenohId::from_str(id_str)
                     .map_err(|e| zrpc::prelude::Status::internal_error(format!("Unable to convert str to ZenohId: {e:?}")))
 
                 }

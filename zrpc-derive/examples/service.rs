@@ -69,13 +69,12 @@ impl Hello for MyServer {
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    use zenoh::prelude::r#async::*;
 
     let mut config = zenoh::config::Config::default();
     config
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
-    let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
+    let zsession = Arc::new(zenoh::open(config).await.unwrap());
 
     let z = zsession.clone();
     let client = HelloClient::builder(zsession).build();
