@@ -62,3 +62,9 @@ jobs:
       with:
         command: test
         args: --release --verbose
+
+    - name: Clean up
+      if: always()
+      uses: actions-rs/cargo@v1
+      with:
+        command: clean
