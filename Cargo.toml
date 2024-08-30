@@ -62,10 +62,10 @@ tokio = { version = "1.35.1", default-features = false, features = [
   "rt",
   "time",
 ] }
-zenoh = { version = "1.0.0-alpha.6", default-features = false }
-zenoh-codec = { version = "1.0.0-alpha.6" }
-zenoh-core = { version = "1.0.0-alpha.6" }
-zenoh-ext = { version = "1.0.0-alpha.6" }
-zenoh-macros = { version = "1.0.0-alpha.6" }
-zenoh-protocol = { version = "1.0.0-alpha.6" }
-zenoh-util = { version = "1.0.0-alpha.6" }
+zenoh = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main", default-features = false }
+zenoh-codec = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh-core = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh-ext = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh-macros = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh-protocol = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh-util = {  git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
