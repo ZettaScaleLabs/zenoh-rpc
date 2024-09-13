@@ -19,7 +19,6 @@ use std::time::Duration;
 use flume::Receiver;
 use log::trace;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use zenoh::config::ZenohId;
 use zenoh::query::*;
 use zenoh::Session;
@@ -35,12 +34,12 @@ use crate::zrpcresult::ZRPCResult;
 
 #[derive(Clone, Debug)]
 pub struct RPCClientChannel {
-    z: Arc<Session>,
+    z: Session,
     service_name: String,
 }
 
 impl RPCClientChannel {
-    pub fn new<IntoString>(z: Arc<Session>, service_name: IntoString) -> RPCClientChannel
+    pub fn new<IntoString>(z: Session, service_name: IntoString) -> RPCClientChannel
     where
         IntoString: Into<String>,
     {

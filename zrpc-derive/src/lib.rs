@@ -467,7 +467,7 @@ impl<'a> ServiceGenerator<'a> {
         quote! {
             #[automatically_derived]
             #vis struct #client_builder_ident<'a> {
-                pub(crate) z: std::sync::Arc<zenoh::Session>,
+                pub(crate) z: zenoh::Session,
                 ke_format: zenoh::key_expr::format::KeFormat<'a>,
                 pub(crate) tout: std::time::Duration,
                 pub(crate) labels: std::collections::HashSet<std::string::String>,
@@ -513,7 +513,7 @@ impl<'a> ServiceGenerator<'a> {
             #[derive(Clone, Debug)]
             #vis struct #client_ident<'a> {
                 pub(crate) ch : zrpc::prelude::RPCClientChannel,
-                pub(crate) z: std::sync::Arc<zenoh::Session>,
+                pub(crate) z: zenoh::Session,
                 pub(crate) ke_format: zenoh::key_expr::format::KeFormat<'a>,
                 pub(crate) tout: std::time::Duration,
                 pub(crate) labels: std::collections::HashSet<std::string::String>,
@@ -523,7 +523,7 @@ impl<'a> ServiceGenerator<'a> {
             impl<'a> #client_ident<'a> {
 
 
-                #vis fn builder(z: std::sync::Arc<zenoh::Session>) -> #client_builder_ident<'a> {
+                #vis fn builder(z: zenoh::Session) -> #client_builder_ident<'a> {
                     #client_builder_ident {
                         z,
                         labels: std::collections::HashSet::new(),
@@ -536,7 +536,6 @@ impl<'a> ServiceGenerator<'a> {
                 #(#fns)*
 
                 async fn find_server(&self) -> std::result::Result<zenoh::config::ZenohId, zrpc::prelude::Status> {
-                    use zenoh::session::SessionDeclarations;
 
                     let res = self
                         .z

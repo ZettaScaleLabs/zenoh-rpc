@@ -15,10 +15,7 @@ use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
 use async_trait::async_trait;
-use zenoh::{
-    config::{EndPoint, ZenohId},
-    session::SessionDeclarations,
-};
+use zenoh::config::{EndPoint, ZenohId};
 //importing the macros
 use zrpc::prelude::*;
 use zrpc_derive::service;
@@ -88,7 +85,7 @@ async fn service_call() {
         "tcp/127.0.0.1:9002".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
+    let client_session = zenoh::open(client_config).await.unwrap();
 
     let c_zid_server = server_zid;
     tokio::task::spawn(async move {
@@ -97,7 +94,7 @@ async fn service_call() {
             "tcp/127.0.0.1:9002".to_string(),
             "tcp/127.0.0.1:9003".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
+        let server_session = zenoh::open(server_config).await.unwrap();
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {
@@ -159,8 +156,8 @@ async fn service_unavailable() {
         "tcp/127.0.0.1:9004".to_string(),
     );
 
-    let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
-    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
+    let server_session = zenoh::open(server_config).await.unwrap();
+    let client_session = zenoh::open(client_config).await.unwrap();
 
     // Check zenoh sessions are connected
     wait_for_peer(&server_session, client_zid).await;
@@ -185,7 +182,7 @@ async fn server_not_matching() {
         "tcp/127.0.0.1:9006".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
+    let client_session = zenoh::open(client_config).await.unwrap();
 
     let c_zid_server = server_zid;
     let st = tokio::task::spawn(async move {
@@ -194,7 +191,7 @@ async fn server_not_matching() {
             "tcp/127.0.0.1:9006".to_string(),
             "tcp/127.0.0.1:9007".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
+        let server_session = zenoh::open(server_config).await.unwrap();
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {
@@ -235,7 +232,7 @@ async fn server_matching() {
         "tcp/127.0.0.1:9008".to_string(),
     );
 
-    let client_session = Arc::new(zenoh::open(client_config).await.unwrap());
+    let client_session = zenoh::open(client_config).await.unwrap();
 
     let c_zid_server = server_zid;
     tokio::task::spawn(async move {
@@ -244,7 +241,7 @@ async fn server_matching() {
             "tcp/127.0.0.1:9008".to_string(),
             "tcp/127.0.0.1:9009".to_string(),
         );
-        let server_session = Arc::new(zenoh::open(server_config).await.unwrap());
+        let server_session = zenoh::open(server_config).await.unwrap();
         wait_for_peer(&server_session, client_zid).await;
 
         let service = MyServer {

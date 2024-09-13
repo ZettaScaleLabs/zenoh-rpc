@@ -17,7 +17,6 @@ use tokio::sync::Mutex;
 use zenoh::config::ZenohId;
 use zenoh::key_expr::KeyExpr;
 use zenoh::liveliness::LivelinessToken;
-use zenoh::prelude::*;
 
 use zenoh::Session;
 
@@ -27,13 +26,13 @@ use crate::status::{Code, Status};
 use crate::types::{Message, ServerMetadata, ServerTaskFuture, WireMessage};
 
 pub struct ServerBuilder {
-    pub(crate) session: Arc<Session>,
+    pub(crate) session: Session,
     pub(crate) services: HashMap<String, Arc<dyn Service + Send + Sync>>,
     pub(crate) labels: HashSet<String>,
 }
 
 impl ServerBuilder {
-    pub fn session(mut self, session: Arc<Session>) -> Self {
+    pub fn session(mut self, session: Session) -> Self {
         self.session = session;
         self
     }
@@ -76,14 +75,14 @@ impl ServerBuilder {
 }
 
 pub struct Server {
-    pub(crate) session: Arc<Session>,
+    pub(crate) session: Session,
     pub(crate) services: HashMap<String, Arc<dyn Service + Send + Sync>>,
-    pub(crate) tokens: Arc<Mutex<Vec<LivelinessToken<'static>>>>,
+    pub(crate) tokens: Arc<Mutex<Vec<LivelinessToken>>>,
     pub(crate) labels: HashSet<String>,
 }
 
 impl Server {
-    pub fn builder(session: Arc<Session>) -> ServerBuilder {
+    pub fn builder(session: Session) -> ServerBuilder {
         ServerBuilder {
             session,
             services: HashMap::new(),

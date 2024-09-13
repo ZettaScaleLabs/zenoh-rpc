@@ -74,7 +74,7 @@ async fn main() {
     config
         .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
         .unwrap();
-    let zsession = Arc::new(zenoh::open(config).await.unwrap());
+    let zsession = zenoh::open(config).await.unwrap();
 
     let z = zsession.clone();
     let client = HelloClient::builder(zsession).build();

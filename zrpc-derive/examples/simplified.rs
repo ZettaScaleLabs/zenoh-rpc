@@ -24,7 +24,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use std::str::{self, FromStr};
 use std::time::Duration;
-use zenoh::{session::SessionDeclarations, Session};
+use zenoh::Session;
 
 // this is the user defined trait
 #[async_trait::async_trait]
@@ -238,7 +238,7 @@ impl Deref for SubResponse {
 }
 
 pub struct HelloClientBuilder<'a> {
-    pub z: Arc<Session>,
+    pub z: Session,
     pub labels: HashSet<String>,
     ke_format: KeFormat<'a>,
     pub tout: Duration,
@@ -283,7 +283,7 @@ impl<'a> HelloClientBuilder<'a> {
 pub struct HelloClient<'a> {
     pub(crate) ch: RPCClientChannel,
     pub(crate) ke_format: KeFormat<'a>,
-    pub(crate) z: Arc<Session>,
+    pub(crate) z: Session,
     pub(crate) tout: Duration,
     pub(crate) labels: HashSet<String>,
 }
@@ -291,7 +291,7 @@ pub struct HelloClient<'a> {
 // generated client code
 
 impl<'a> HelloClient<'a> {
-    pub fn builder(z: Arc<zenoh::Session>) -> HelloClientBuilder<'a> {
+    pub fn builder(z: zenoh::Session) -> HelloClientBuilder<'a> {
         HelloClientBuilder {
             z,
             labels: HashSet::new(),
@@ -398,7 +398,7 @@ async fn main() {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let zsession = Arc::new(zenoh::open(config).await.unwrap());
+        let zsession = zenoh::open(config).await.unwrap();
 
         let z = zsession.clone();
 
