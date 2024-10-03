@@ -106,10 +106,7 @@ impl RPCClientChannel {
                 Ok(sample) => {
                     // This is infallible, using unwrap_or_default so that if cannot get
                     // the vec then the deseriazliation fail on an empty one.
-                    let raw_data = sample
-                        .payload()
-                        .deserialize::<Vec<u8>>()
-                        .unwrap_or_default();
+                    let raw_data = sample.payload().to_bytes().to_vec();
 
                     let wmsg: WireMessage = deserialize(&raw_data).map_err(|e| {
                         Status::new(Code::InternalError, format!("deserialization error: {e:?}"))
@@ -164,7 +161,7 @@ impl RPCClientChannel {
             // getting only the ones we can deserialize
             .filter_map(|s| {
                 // This is infallible
-                let raw_data = s.payload().deserialize::<Vec<u8>>().unwrap_or_default();
+                let raw_data = s.payload().to_bytes().to_vec();
                 deserialize::<WireMessage>(&raw_data).ok()
             })
             // get only the ones that do not have errors

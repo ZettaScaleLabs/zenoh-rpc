@@ -161,8 +161,8 @@ impl Server {
                         .ok_or_else(|| {
                             Status::internal_error("Query has empty value cannot proceed")
                         })?
-                        .deserialize::<Vec<u8>>()
-                        .unwrap_or_default();
+                        .to_bytes()
+                        .to_vec();
 
                     // this is call to a service
                     Box::pin(Self::service_call(svc, ke.clone(), payload))
