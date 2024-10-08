@@ -16,10 +16,10 @@ extern crate serde;
 
 use std::time::Duration;
 
-use flume::Receiver;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use zenoh::config::ZenohId;
+use zenoh::handlers::FifoChannelHandler;
 use zenoh::query::*;
 use zenoh::Session;
 
@@ -59,7 +59,7 @@ impl RPCClientChannel {
         request: &Request<T>,
         method: &str,
         tout: Duration,
-    ) -> ZRPCResult<Receiver<Reply>>
+    ) -> ZRPCResult<FifoChannelHandler<Reply>>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
