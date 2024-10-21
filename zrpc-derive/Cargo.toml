@@ -28,7 +28,7 @@ syn-serde = { workspace = true }
 tokio = { workspace = true, features = ["io-std","io-util", "rt-multi-thread"]}
 zenoh = { workspace = true }
 zenoh-util = { workspace = true }
-zrpc = { version = "0.8.0-alpha.1", path = "../zrpc" }
+zrpc = { version = "0.8.1-dev", path = "../zrpc" }
 
 [dev-dependencies]
 env_logger = { workspace = true }

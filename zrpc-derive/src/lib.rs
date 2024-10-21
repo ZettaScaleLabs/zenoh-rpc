@@ -121,15 +121,14 @@ impl Parse for RPCMethod {
                 }
             }
         }
-        match recv {
-            None => extend_errors!(
+        if recv.is_none() {
+            extend_errors!(
                 errors,
                 syn::Error::new(
                     recv.span(),
                     "Missing any receiver in method declaration, please add one!"
                 )
-            ),
-            Some(_) => (),
+            )
         }
 
         errors?;
