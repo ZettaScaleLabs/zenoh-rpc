@@ -98,8 +98,8 @@ impl From<std::str::Utf8Error> for ZRPCError {
     }
 }
 
-impl From<zenoh_util::core::Error> for ZRPCError {
-    fn from(err: zenoh_util::core::Error) -> Self {
+impl From<zenoh::Error> for ZRPCError {
+    fn from(err: zenoh::Error) -> Self {
         ZRPCError::ZenohError(err.to_string())
     }
 }

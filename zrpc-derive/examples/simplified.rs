@@ -13,19 +13,18 @@
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::sync::Mutex;
+use zenoh::config::ZenohId;
 use zenoh::key_expr::format::KeFormat;
-use zenoh::prelude::ZenohId;
 
+use zenoh::key_expr::KeyExpr;
 use zrpc::prelude::*;
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::str::{self, FromStr};
 use std::time::Duration;
-use zenoh::{Session, SessionDeclarations};
-
-use serde::{Deserialize, Serialize};
-use zenoh::prelude::r#async::*;
+use zenoh::Session;
 
 // this is the user defined trait
 #[async_trait::async_trait]
@@ -239,7 +238,7 @@ impl Deref for SubResponse {
 }
 
 pub struct HelloClientBuilder<'a> {
-    pub z: Arc<Session>,
+    pub z: Session,
     pub labels: HashSet<String>,
     ke_format: KeFormat<'a>,
     pub tout: Duration,
@@ -284,7 +283,7 @@ impl<'a> HelloClientBuilder<'a> {
 pub struct HelloClient<'a> {
     pub(crate) ch: RPCClientChannel,
     pub(crate) ke_format: KeFormat<'a>,
-    pub(crate) z: Arc<Session>,
+    pub(crate) z: Session,
     pub(crate) tout: Duration,
     pub(crate) labels: HashSet<String>,
 }
@@ -292,7 +291,7 @@ pub struct HelloClient<'a> {
 // generated client code
 
 impl<'a> HelloClient<'a> {
-    pub fn builder(z: Arc<zenoh::Session>) -> HelloClientBuilder<'a> {
+    pub fn builder(z: zenoh::Session) -> HelloClientBuilder<'a> {
         HelloClientBuilder {
             z,
             labels: HashSet::new(),
@@ -349,7 +348,6 @@ impl<'a> HelloClient<'a> {
             .z
             .liveliness()
             .get("@rpc/*/service/Hello")
-            .res()
             .await
             .map_err(|e| {
                 Status::unavailable(format!("Unable to perform liveliness query: {e:?}"))
@@ -357,13 +355,8 @@ impl<'a> HelloClient<'a> {
 
         let ids = res
             .into_iter()
-            .map(|e| {
-                self.extract_id_from_ke(
-                    &e.sample
-                        .map_err(|_| Status::unavailable("Cannot get value from sample"))?
-                        .key_expr,
-                )
-            })
+            .filter_map(|e| e.into_result().ok())
+            .map(|e| self.extract_id_from_ke(e.key_expr()))
             .collect::<Result<Vec<ZenohId>, Status>>()?;
 
         // get server metadata
@@ -400,13 +393,10 @@ impl<'a> HelloClient<'a> {
 async fn main() {
     {
         env_logger::init();
-        use zenoh::prelude::r#async::*;
 
         let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let zsession = Arc::new(zenoh::open(config).res().await.unwrap());
+        config.set_mode(Some(zenoh::config::WhatAmI::Peer)).unwrap();
+        let zsession = zenoh::open(config).await.unwrap();
 
         let z = zsession.clone();
 

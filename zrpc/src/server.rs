@@ -14,8 +14,9 @@
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
+use zenoh::config::ZenohId;
+use zenoh::key_expr::KeyExpr;
 use zenoh::liveliness::LivelinessToken;
-use zenoh::prelude::r#async::*;
 
 use zenoh::Session;
 
@@ -25,13 +26,13 @@ use crate::status::{Code, Status};
 use crate::types::{Message, ServerMetadata, ServerTaskFuture, WireMessage};
 
 pub struct ServerBuilder {
-    pub(crate) session: Arc<Session>,
+    pub(crate) session: Session,
     pub(crate) services: HashMap<String, Arc<dyn Service + Send + Sync>>,
     pub(crate) labels: HashSet<String>,
 }
 
 impl ServerBuilder {
-    pub fn session(mut self, session: Arc<Session>) -> Self {
+    pub fn session(mut self, session: Session) -> Self {
         self.session = session;
         self
     }
@@ -74,14 +75,14 @@ impl ServerBuilder {
 }
 
 pub struct Server {
-    pub(crate) session: Arc<Session>,
+    pub(crate) session: Session,
     pub(crate) services: HashMap<String, Arc<dyn Service + Send + Sync>>,
-    pub(crate) tokens: Arc<Mutex<Vec<LivelinessToken<'static>>>>,
+    pub(crate) tokens: Arc<Mutex<Vec<LivelinessToken>>>,
     pub(crate) labels: HashSet<String>,
 }
 
 impl Server {
-    pub fn builder(session: Arc<Session>) -> ServerBuilder {
+    pub fn builder(session: Session) -> ServerBuilder {
         ServerBuilder {
             session,
             services: HashMap::new(),
@@ -100,17 +101,12 @@ impl Server {
         // register the queryables and declare a liveliness token
         let ke = format!("@rpc/{}/**", self.instance_uuid());
 
-        let queryable = self
-            .session
-            .declare_queryable(&ke)
-            .res()
-            .await
-            .map_err(|e| {
-                Status::new(
-                    Code::InternalError,
-                    format!("Cannot declare queryable: {e:?}"),
-                )
-            })?;
+        let queryable = self.session.declare_queryable(&ke).await.map_err(|e| {
+            Status::new(
+                Code::InternalError,
+                format!("Cannot declare queryable: {e:?}"),
+            )
+        })?;
 
         for k in self.services.keys() {
             let ke = format!("@rpc/{}/service/{k}", self.instance_uuid());
@@ -118,7 +114,6 @@ impl Server {
                 .session
                 .liveliness()
                 .declare_token(ke)
-                .res()
                 .await
                 .map_err(|e| {
                     Status::new(
@@ -162,12 +157,11 @@ impl Server {
                         .clone();
 
                     let payload = query
-                        .value()
+                        .payload()
                         .ok_or_else(|| {
                             Status::internal_error("Query has empty value cannot proceed")
                         })?
-                        .payload
-                        .contiguous()
+                        .to_bytes()
                         .to_vec();
 
                     // this is call to a service
@@ -187,16 +181,16 @@ impl Server {
             tokio::task::spawn(async move {
                 let res = fut.await;
                 let sample = match res {
-                    Ok(data) => Sample::new(ke, data),
+                    Ok(data) => data,
                     Err(e) => {
                         let wmgs = WireMessage {
                             payload: None,
                             status: e,
                         };
-                        Sample::new(ke, serialize(&wmgs).unwrap_or_default())
+                        serialize(&wmgs).unwrap_or_default()
                     }
                 };
-                let res = query.reply(Ok(sample)).res().await;
+                let res = query.reply(ke, sample).await;
                 log::trace!("Query Result is: {res:?}");
             });
         }

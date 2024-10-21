@@ -16,11 +16,10 @@ extern crate serde;
 
 use std::time::Duration;
 
-use flume::Receiver;
 use log::trace;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use zenoh::prelude::r#async::*;
+use zenoh::config::ZenohId;
+use zenoh::handlers::FifoChannelHandler;
 use zenoh::query::*;
 use zenoh::Session;
 
@@ -35,12 +34,12 @@ use crate::zrpcresult::ZRPCResult;
 
 #[derive(Clone, Debug)]
 pub struct RPCClientChannel {
-    z: Arc<Session>,
+    z: Session,
     service_name: String,
 }
 
 impl RPCClientChannel {
-    pub fn new<IntoString>(z: Arc<Session>, service_name: IntoString) -> RPCClientChannel
+    pub fn new<IntoString>(z: Session, service_name: IntoString) -> RPCClientChannel
     where
         IntoString: Into<String>,
     {
@@ -60,7 +59,7 @@ impl RPCClientChannel {
         request: &Request<T>,
         method: &str,
         tout: Duration,
-    ) -> ZRPCResult<Receiver<Reply>>
+    ) -> ZRPCResult<FifoChannelHandler<Reply>>
     where
         T: Serialize + Clone + std::fmt::Debug,
         for<'de2> T: Deserialize<'de2>,
@@ -74,10 +73,9 @@ impl RPCClientChannel {
         Ok(self
             .z
             .get(&selector)
-            .with_value(req)
+            .payload(req)
             .target(QueryTarget::All)
             .timeout(tout)
-            .res()
             .await?)
     }
 
@@ -104,9 +102,11 @@ impl RPCClientChannel {
         let reply = data_receiver.recv_async().await;
         log::trace!("Response from zenoh is {:?}", reply);
         if let Ok(reply) = reply {
-            match reply.sample {
+            match reply.result() {
                 Ok(sample) => {
-                    let raw_data: Vec<u8> = sample.payload.contiguous().to_vec();
+                    // This is infallible, using unwrap_or_default so that if cannot get
+                    // the vec then the deseriazliation fail on an empty one.
+                    let raw_data = sample.payload().to_bytes().to_vec();
 
                     let wmsg: WireMessage = deserialize(&raw_data).map_err(|e| {
                         Status::new(Code::InternalError, format!("deserialization error: {e:?}"))
@@ -151,17 +151,17 @@ impl RPCClientChannel {
             .get(ke)
             .target(QueryTarget::All)
             .timeout(tout)
-            .res()
             .await
             .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
 
         let metadata = data
             .into_iter()
             // getting only reply with Sample::Ok
-            .filter_map(|r| r.sample.ok())
+            .filter_map(|r| r.into_result().ok())
             // getting only the ones we can deserialize
             .filter_map(|s| {
-                let raw_data = s.payload.contiguous().to_vec();
+                // This is infallible
+                let raw_data = s.payload().to_bytes().to_vec();
                 deserialize::<WireMessage>(&raw_data).ok()
             })
             // get only the ones that do not have errors
