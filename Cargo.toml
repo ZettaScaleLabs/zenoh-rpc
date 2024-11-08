@@ -62,10 +62,10 @@ tokio = { version = "1.35.1", default-features = false, features = [
   "rt",
   "time",
 ] }
-zenoh = {  version= "1.0.1", default-features = false }
-zenoh-codec = {  version= "1.0.1" }
-zenoh-core = {  version= "1.0.1" }
-zenoh-ext = { version= "1.0.1" }
-zenoh-macros = {  version= "1.0.1" }
-zenoh-protocol = {  version= "1.0.1" }
-zenoh-util = {  version= "1.0.1" }
+zenoh = {  version= "1.0.2", default-features = false }
+zenoh-codec = {  version= "1.0.2" }
+zenoh-core = {  version= "1.0.2" }
+zenoh-ext = { version= "1.0.2" }
+zenoh-macros = {  version= "1.0.2" }
+zenoh-protocol = {  version= "1.0.2" }
+zenoh-util = {  version= "1.0.2" }
