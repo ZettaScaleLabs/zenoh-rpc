@@ -151,6 +151,7 @@ impl RPCClientChannel {
             .z
             .get(ke)
             .target(QueryTarget::All)
+            .consolidation(ConsolidationMode::None)
             .timeout(tout)
             .await
             .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
