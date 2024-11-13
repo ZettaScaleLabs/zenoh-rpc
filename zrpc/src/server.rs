@@ -108,6 +108,8 @@ impl Server {
             )
         })?;
 
+        log::debug!("[Server] declared queryabled on: {ke}");
+
         for k in self.services.keys() {
             let ke = format!("@rpc/{}/service/{k}", self.instance_uuid());
             let lt = self
@@ -145,8 +147,11 @@ impl Server {
 
             let ke = query.key_expr().clone();
 
+            log::debug!("[Server] received query on: {ke}");
+
             let fut: ServerTaskFuture = match Self::get_token(&ke, 2) {
                 Some("service") => {
+                    log::debug!("[Server] call to service");
                     let service_name = Self::get_service_name(&ke)?;
                     let svc = self
                         .services
@@ -167,11 +172,15 @@ impl Server {
                     // this is call to a service
                     Box::pin(Self::service_call(svc, ke.clone(), payload))
                 }
-                Some("metadata") => Box::pin(Self::server_metadata(
-                    self.labels.clone(),
-                    self.instance_uuid(),
-                )),
+                Some("metadata") => {
+                    log::debug!("[Server] call to metadata");
+                    Box::pin(Self::server_metadata(
+                        self.labels.clone(),
+                        self.instance_uuid(),
+                    ))
+                }
                 Some(_) | None => {
+                    log::warn!("[Server] unknown call");
                     // this calls returns internal error
                     Box::pin(Self::create_error())
                 }

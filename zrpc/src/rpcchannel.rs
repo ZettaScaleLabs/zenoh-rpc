@@ -75,6 +75,7 @@ impl RPCClientChannel {
             .get(&selector)
             .payload(req)
             .target(QueryTarget::All)
+            .consolidation(ConsolidationMode::None)
             .timeout(tout)
             .await?)
     }
