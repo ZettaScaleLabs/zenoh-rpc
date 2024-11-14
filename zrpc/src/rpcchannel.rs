@@ -16,7 +16,6 @@ extern crate serde;
 
 use std::time::Duration;
 
-use log::trace;
 use serde::{Deserialize, Serialize};
 use zenoh::config::ZenohId;
 use zenoh::handlers::FifoChannelHandler;
@@ -69,7 +68,7 @@ impl RPCClientChannel {
             "@rpc/{}/service/{}/{}",
             server_id, self.service_name, method
         );
-        trace!("Sending {:?} to  {:?}", request, selector);
+        tracing::debug!("Sending {:?} to  {:?}", request, selector);
         Ok(self
             .z
             .get(&selector)
@@ -95,13 +94,14 @@ impl RPCClientChannel {
         U: Serialize + Clone + std::fmt::Debug,
         for<'de3> U: Deserialize<'de3>,
     {
+        tracing::debug!("calling function: {request:?}");
         let data_receiver = self
             .send(server_id, &request, method, tout)
             .await
             .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
         //takes only one, eval goes to only one
         let reply = data_receiver.recv_async().await;
-        log::trace!("Response from zenoh is {:?}", reply);
+        tracing::debug!("Response from zenoh is {:?}", reply);
         if let Ok(reply) = reply {
             match reply.result() {
                 Ok(sample) => {
@@ -125,7 +125,7 @@ impl RPCClientChannel {
                     }
                 }
                 Err(e) => {
-                    log::error!("Unable to get sample from {e:?}");
+                    tracing::error!("Unable to get sample from {e:?}");
                     Err(Status::new(
                         Code::InternalError,
                         format!("Unable to get sample from {e:?}"),
@@ -133,7 +133,7 @@ impl RPCClientChannel {
                 }
             }
         } else {
-            log::error!("No data from server");
+            tracing::error!("No data from server");
             Err(Status::new(
                 Code::InternalError,
                 format!("No data from call_fun for Request {:?}", request),
@@ -146,34 +146,41 @@ impl RPCClientChannel {
         ids: &[ZenohId],
         tout: Duration,
     ) -> Result<Vec<ServerMetadata>, Status> {
-        let ke = "@rpc/*/metadata".to_string();
-        let data = self
-            .z
-            .get(ke)
-            .target(QueryTarget::All)
-            .consolidation(ConsolidationMode::None)
-            .timeout(tout)
-            .await
-            .map_err(|e| Status::new(Code::InternalError, format!("communication error: {e:?}")))?;
+        let mut tot_metadata = Vec::with_capacity(ids.len());
 
-        let metadata = data
-            .into_iter()
-            // getting only reply with Sample::Ok
-            .filter_map(|r| r.into_result().ok())
-            // getting only the ones we can deserialize
-            .filter_map(|s| {
-                // This is infallible
-                let raw_data = s.payload().to_bytes().to_vec();
-                deserialize::<WireMessage>(&raw_data).ok()
-            })
-            // get only the ones that do not have errors
-            .filter_map(|wmgs| wmgs.payload)
-            // get the ones where we can actually deserialize the payload
-            .filter_map(|pl| deserialize::<ServerMetadata>(&pl).ok())
-            // filter by the IDs providing the needed service
-            .filter(|m| ids.contains(&m.id))
-            .collect();
+        for id in ids {
+            //do one query per id... not efficient
+            let ke = format!("@rpc/{id}/metadata");
+            let data = self
+                .z
+                .get(ke)
+                .target(QueryTarget::All)
+                .consolidation(ConsolidationMode::None)
+                .timeout(tout)
+                .await
+                .map_err(|e| {
+                    Status::new(Code::InternalError, format!("communication error: {e:?}"))
+                })?;
+            let metadata = data
+                .into_iter()
+                // getting only reply with Sample::Ok
+                .filter_map(|r| r.into_result().ok())
+                // getting only the ones we can deserialize
+                .filter_map(|s| {
+                    // This is infallible
+                    let raw_data = s.payload().to_bytes().to_vec();
+                    deserialize::<WireMessage>(&raw_data).ok()
+                })
+                // get only the ones that do not have errors
+                .filter_map(|wmgs| wmgs.payload)
+                // get the ones where we can actually deserialize the payload
+                .filter_map(|pl| deserialize::<ServerMetadata>(&pl).ok())
+                // filter by the IDs providing the needed service
+                .filter(|m| ids.contains(&m.id))
+                .collect::<Vec<ServerMetadata>>();
 
-        Ok(metadata)
+            tot_metadata.extend_from_slice(&metadata);
+        }
+        Ok(tot_metadata)
     }
 }

@@ -108,7 +108,7 @@ impl Server {
             )
         })?;
 
-        log::debug!("[Server] declared queryabled on: {ke}");
+        tracing::debug!("[Server] declared queryabled on: {ke}");
 
         for k in self.services.keys() {
             let ke = format!("@rpc/{}/service/{k}", self.instance_uuid());
@@ -147,11 +147,11 @@ impl Server {
 
             let ke = query.key_expr().clone();
 
-            log::debug!("[Server] received query on: {ke}");
+            tracing::debug!("[Server] received query on: {ke}");
 
             let fut: ServerTaskFuture = match Self::get_token(&ke, 2) {
                 Some("service") => {
-                    log::debug!("[Server] call to service");
+                    tracing::debug!("[Server] call to service");
                     let service_name = Self::get_service_name(&ke)?;
                     let svc = self
                         .services
@@ -173,14 +173,14 @@ impl Server {
                     Box::pin(Self::service_call(svc, ke.clone(), payload))
                 }
                 Some("metadata") => {
-                    log::debug!("[Server] call to metadata");
+                    tracing::debug!("[Server] call to metadata");
                     Box::pin(Self::server_metadata(
                         self.labels.clone(),
                         self.instance_uuid(),
                     ))
                 }
                 Some(_) | None => {
-                    log::warn!("[Server] unknown call");
+                    tracing::error!("[Server] unknown call");
                     // this calls returns internal error
                     Box::pin(Self::create_error())
                 }
@@ -200,7 +200,7 @@ impl Server {
                     }
                 };
                 let res = query.reply(ke, sample).await;
-                log::trace!("Query Result is: {res:?}");
+                tracing::debug!("Query Result is: {res:?}");
             });
         }
 
@@ -223,7 +223,7 @@ impl Server {
 
         match svc.call(msg).await {
             Ok(msg) => {
-                log::trace!("Service response: {msg:?}");
+                tracing::debug!("Service response: {msg:?}");
                 let wmsg = WireMessage {
                     payload: Some(msg.body),
                     status: Status::ok(""),
@@ -233,7 +233,7 @@ impl Server {
                     .map_err(|e| Status::internal_error(format!("Serialization error: {e:?}")))
             }
             Err(e) => {
-                log::trace!("Service error is : {e:?}");
+                tracing::error!("Service error is : {e:?}");
                 let wmsg = WireMessage {
                     payload: None,
                     status: e,

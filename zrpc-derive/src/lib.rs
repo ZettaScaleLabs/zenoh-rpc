@@ -544,7 +544,6 @@ impl<'a> ServiceGenerator<'a> {
                         .map_err(|e| {
                             zrpc::prelude::Status::unavailable(format!("Unable to perform liveliness query: {e:?}"))
                         })?;();
-
                         let ids = res
                         .into_iter()
                         .filter_map(|e| e.into_result().ok())
@@ -554,9 +553,7 @@ impl<'a> ServiceGenerator<'a> {
                             )
                         })
                         .collect::<std::result::Result<std::vec::Vec<zenoh::config::ZenohId>, zrpc::prelude::Status>>()?;
-
                     let metadatas = self.ch.get_servers_metadata(&ids, self.tout).await?;
-
                     let mut ids: Vec<zenoh::config::ZenohId> = metadatas
                     .into_iter()
                     .filter(|m| m.labels.is_superset(&self.labels))
