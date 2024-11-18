@@ -32,7 +32,7 @@ tokio = { workspace = true, features = [
 tracing = { workspace = true }
 zenoh = { workspace = true }
 zenoh-util = { workspace = true }
-zrpc = { version = "0.8.4", path = "../zrpc" }
+zrpc = { version = "0.8.5-dev", path = "../zrpc" }
 
 [dev-dependencies]
 env_logger = { workspace = true }
