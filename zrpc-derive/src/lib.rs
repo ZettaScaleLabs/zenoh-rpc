@@ -208,7 +208,7 @@ struct ServiceGenerator<'a> {
     tout: &'a u16,
 }
 
-impl<'a> ServiceGenerator<'a> {
+impl ServiceGenerator<'_> {
     // parses the server trait
     fn trait_service(&self) -> TokenStream2 {
         let &Self {
@@ -583,7 +583,7 @@ impl<'a> ServiceGenerator<'a> {
 }
 
 /// Converts ServiceGenerator to actual code
-impl<'a> ToTokens for ServiceGenerator<'a> {
+impl ToTokens for ServiceGenerator<'_> {
     fn to_tokens(&self, output: &mut TokenStream2) {
         output.extend(vec![
             self.trait_service(),
