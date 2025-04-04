@@ -14,7 +14,10 @@
 name: Publish Artifactory
 on:
   workflow_dispatch:
-
+    inputs:
+      dryrun:
+        default: true
+        type: boolean
 env:
   CARGO_REGISTRIES_ARTIFACTORY_TOKEN: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_TOKEN}}
   CARGO_REGISTRIES_ARTIFACTORY_INDEX: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_INDEX }}
@@ -53,6 +56,8 @@ jobs:
       run: |
         toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zenoh.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
         mv Cargo.toml.tmp Cargo.toml
+        toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zrpc.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
+        mv Cargo.toml.tmp Cargo.toml
 
     - name: Code format check
       uses: actions-rs/cargo@v1
@@ -78,7 +83,14 @@ jobs:
         command: test
         args: --release --verbose
 
+
+    - name: Package
+      run: |
+        cargo package -p zrpc --allow-dirty
+        cargo package -p zrpc-derive --allow-dirty
+
     - name: Publish
+      if: ${{ !inputs.dryrun }}
       run: |
         cargo publish -p zrpc --registry artifactory --allow-dirty
         sleep 10
