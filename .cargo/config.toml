@@ -1,0 +1,3 @@
+[registries.artifactory]
+index = "sparse+https://zettascale.jfrog.io/artifactory/api/cargo/zetta-private/index/"
+credential-provider = ["cargo:token"]
