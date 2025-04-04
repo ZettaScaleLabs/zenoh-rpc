@@ -44,6 +44,11 @@ jobs:
       with:
         tool: toml-cli2
 
+    - name: Install yj
+      uses: tecolicom/actions-use-homebrew-tools@v1
+      with:
+        tools: yj
+
     - name: Update Dependencies
       run: |
         toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zenoh.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
