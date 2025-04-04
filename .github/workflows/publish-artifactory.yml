@@ -1,0 +1,88 @@
+#
+# Copyright (c) 2017, 2021 ADLINK Technology Inc.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+# which is available at https://www.apache.org/licenses/LICENSE-2.0.
+#
+# SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+#
+# Contributors:
+#   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+#
+name: Publish Artifactory
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_REGISTRIES_ARTIFACTORY_TOKEN: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_TOKEN}}
+  CARGO_REGISTRIES_ARTIFACTORY_INDEX: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_INDEX }}
+  CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: "cargo:token"
+  CARGO_REGISTRY_DEFAULT: "artifactory"
+
+jobs:
+  build:
+
+    name: Build on ${{ matrix.os }}
+    runs-on: ["ubuntu-runner-set"]
+    strategy:
+      fail-fast: true
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install latest nightly
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+    - name: Install toml-cli2
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: toml-cli2
+
+    - name: Update Dependencies
+      run: |
+        toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zenoh.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
+        mv Cargo.toml.tmp Cargo.toml
+
+    - name: Code format check
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: -- --check
+
+    - name: Clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: --all-targets -- -D warnings
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --verbose --all-targets
+
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --release --verbose
+
+    - name: Publish
+      run: |
+        cargo publish -p zrpc --registry artifactory --allow-dirty
+        sleep 10
+        cargo publish -p zrpc-derive --registry artifactory --allow-dirty
+      
+
+
+    - name: Clean up
+      if: always()
+      uses: actions-rs/cargo@v1
+      with:
+        command: clean
