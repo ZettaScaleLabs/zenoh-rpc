@@ -84,9 +84,3 @@ jobs:
         cargo publish -p zrpc --registry artifactory --allow-dirty
         sleep 10
         cargo publish -p zrpc-derive --registry artifactory --allow-dirty
-
-    - name: Clean up
-      if: always()
-      uses: actions-rs/cargo@v1
-      with:
-        command: clean
