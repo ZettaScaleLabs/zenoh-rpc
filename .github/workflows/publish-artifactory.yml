@@ -22,7 +22,6 @@ env:
   CARGO_REGISTRIES_ARTIFACTORY_TOKEN: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_TOKEN}}
   CARGO_REGISTRIES_ARTIFACTORY_INDEX: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_INDEX }}
   CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS: "cargo:token"
-  CARGO_REGISTRY_DEFAULT: "artifactory"
 
 jobs:
   build:
@@ -35,13 +34,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
     - name: Install toml-cli2
       uses: taiki-e/cache-cargo-install-action@v2
       with:
@@ -51,6 +43,13 @@ jobs:
       uses: tecolicom/actions-use-homebrew-tools@v1
       with:
         tools: yj
+
+    - name: Install Rust toolchain
+    # NOTE: Showing the active Rust toolchain (defined by the rust-toolchain.toml file)
+    # will have the side effect of installing it; if it's not installed already.
+      run: |
+        rustup toolchain uninstall $(toml get rust-toolchain.toml toolchain.channel -r)
+        rustup toolchain install $(toml get rust-toolchain.toml toolchain.channel -r)
 
     - name: Update Dependencies
       run: |
