@@ -73,10 +73,10 @@ jobs:
     - name: Run tests
       run: cargo test --verbose --release
 
-    - name: Package
+    - name: Cargo check
       run: |
-        cargo package -p zrpc --allow-dirty
-        cargo package -p zrpc-derive --allow-dirty
+        cargo check -p zrpc
+        cargo check -p zrpc-derive
 
     - name: Publish
       if: ${{ !inputs.dryrun }}
