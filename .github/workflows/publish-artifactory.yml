@@ -58,9 +58,7 @@ jobs:
 
     - name: Update Dependencies
       run: |
-        toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zenoh.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
-        mv Cargo.toml.tmp Cargo.toml
-        toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zrpc.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
+        toml get Cargo.toml . | jq '.workspace.dependencies |= with_entries(if .key | test("zenoh.*|zrpc.*") then .value += {registry: "artifactory"} else . end)' | yj -yt > Cargo.toml.tmp
         mv Cargo.toml.tmp Cargo.toml
 
     - name: Code format check
