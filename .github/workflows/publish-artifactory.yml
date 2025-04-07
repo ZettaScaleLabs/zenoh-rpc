@@ -38,6 +38,8 @@ jobs:
       uses: taiki-e/cache-cargo-install-action@v2
       with:
         tool: toml-cli2
+      env:
+        CARGO_REGISTRY_DEFAULT: "crates-io"
 
     - name: Install yj
       uses: tecolicom/actions-use-homebrew-tools@v1
