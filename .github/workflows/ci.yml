@@ -1,0 +1,54 @@
+#
+# Copyright (c) 2017, 2021 ADLINK Technology Inc.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+# which is available at https://www.apache.org/licenses/LICENSE-2.0.
+#
+# SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+#
+# Contributors:
+#   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+#
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build:
+
+    name: Build on ubuntu-runner-set
+    runs-on: [ubuntu-runner-set]
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install toml-cli2
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: toml-cli2
+
+    - name: Install Rust toolchain
+      run: |
+        rustup toolchain uninstall $(toml get rust-toolchain.toml toolchain.channel -r)
+        rustup toolchain install $(toml get rust-toolchain.toml toolchain.channel -r)
+        rustup component add rustfmt clippy
+
+    - name: Code format check
+      run: cargo fmt --check
+
+    - name: Clippy
+      run: cargo clippy --all-targets -- -D warnings
+
+    - name: Build
+      run: cargo build --verbose --all-targets
+
+    - name: Run tests
+      run: cargo test --verbose --release
