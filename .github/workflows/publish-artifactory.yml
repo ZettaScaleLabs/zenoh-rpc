@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       dryrun:
-        default: false
+        default: true
         type: boolean
 env:
   CARGO_REGISTRIES_ARTIFACTORY_TOKEN: ${{ secrets.CARGO_REGISTRIES_ARTIFACTORY_TOKEN}}
@@ -84,7 +84,7 @@ jobs:
         cargo check -p zrpc-derive
 
     - name: Publish
-      if: ${{ !inputs.dryrun }}
+      if: ${{ github.event == "push" || (github.event == "workflow_dispatch" && inputs.dryrun == false) }}
       run: |
         cargo publish -p zrpc --registry artifactory --allow-dirty
         sleep 10
