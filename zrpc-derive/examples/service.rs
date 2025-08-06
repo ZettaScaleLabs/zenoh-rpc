@@ -95,28 +95,28 @@ async fn main() {
             name: "client".to_string(),
         }))
         .await;
-    println!("Res is: {:?}", hello);
+    println!("Res is: {hello:?}");
 
     press_to_continue().await;
     let res = client.add(AddRequest {}).await;
-    println!("Res is: {:?}", res);
+    println!("Res is: {res:?}");
 
     press_to_continue().await;
     let res = client.add(AddRequest {}).await;
-    println!("Res is: {:?}", res);
+    println!("Res is: {res:?}");
 
     press_to_continue().await;
     let res = client.add(AddRequest {}).await;
-    println!("Res is: {:?}", res);
+    println!("Res is: {res:?}");
 
     // press_to_continue().await;
     // let res = client.sub(Request::new(SubRequest {})).await;
-    // println!("Res is: {:?}", res);
+    // println!("Res is: {res:?}");
     let req = TestSerdeJsonValueRequest {
         value: serde_json::Value::Bool(true),
     };
     let res = client.test_serde_json_value(Request::new(req)).await;
-    println!("Res is: {:?}", res);
+    println!("Res is: {res:?}");
 }
 
 async fn press_to_continue() {

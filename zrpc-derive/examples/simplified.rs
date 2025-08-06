@@ -420,23 +420,23 @@ async fn main() {
                 name: "client".to_string(),
             })
             .await;
-        println!("Res is: {:?}", hello);
+        println!("Res is: {hello:?}");
 
         press_to_continue().await;
         let res = client.add(AddRequest {}).await;
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
         let res = client.add(AddRequest {}).await;
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
         let res = client.add(AddRequest {}).await;
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
         let res = client.sub(SubRequest {}).await;
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
     }
 }
 
