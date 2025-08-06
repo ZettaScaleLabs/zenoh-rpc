@@ -136,7 +136,7 @@ impl RPCClientChannel {
             tracing::error!("No data from server");
             Err(Status::new(
                 Code::InternalError,
-                format!("No data from call_fun for Request {:?}", request),
+                format!("No data from call_fun for Request {request:?}"),
             ))
         }
     }

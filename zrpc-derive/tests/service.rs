@@ -54,7 +54,7 @@ impl Hello for MyServer {
 
 fn configure_zenoh(id: ZenohId, listen: String, connect: String) -> zenoh::config::Config {
     let mut config = zenoh::config::Config::default();
-    config.set_id(id).unwrap();
+    config.set_id(Some(id)).unwrap();
     config.set_mode(Some(zenoh::config::WhatAmI::Peer)).unwrap();
     config.scouting.multicast.set_enabled(Some(false)).unwrap();
 

@@ -120,17 +120,17 @@ async fn main() {
 
         println!("Checking server liveliness");
         let res = server_checker.find_servers_livelines().await.unwrap();
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
         println!("Checking server metadata");
         let res = server_checker.get_servers_metadata().await.unwrap();
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
         println!("Checking server ids");
         let res = server_checker.find_servers().await.unwrap();
-        println!("Res is: {:?}", res);
+        println!("Res is: {res:?}");
 
         press_to_continue().await;
     }

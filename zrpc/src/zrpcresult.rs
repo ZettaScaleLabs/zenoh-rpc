@@ -38,13 +38,13 @@ pub enum ZRPCError {
 impl fmt::Display for ZRPCError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ZRPCError::DeserializationError(err) => write!(f, "{}", err),
-            ZRPCError::SerializationError(err) => write!(f, "{}", err),
-            ZRPCError::ZenohError(err) => write!(f, "{}", err),
-            ZRPCError::StateTransitionNotAllowed(err) => write!(f, "{}", err),
-            ZRPCError::Error(err) => write!(f, "{}", err),
-            ZRPCError::IOError(err) => write!(f, "{}", err),
-            ZRPCError::ChannelError(err) => write!(f, "{}", err),
+            ZRPCError::DeserializationError(err) => write!(f, "{err}"),
+            ZRPCError::SerializationError(err) => write!(f, "{err}"),
+            ZRPCError::ZenohError(err) => write!(f, "{err}"),
+            ZRPCError::StateTransitionNotAllowed(err) => write!(f, "{err}"),
+            ZRPCError::Error(err) => write!(f, "{err}"),
+            ZRPCError::IOError(err) => write!(f, "{err}"),
+            ZRPCError::ChannelError(err) => write!(f, "{err}"),
             ZRPCError::MissingValue => write!(f, "Missing Value in Option"),
             ZRPCError::NotFound => write!(f, "Component not found"),
             ZRPCError::Unreachable => write!(f, "Unreachable code!"),
