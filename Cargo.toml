@@ -25,7 +25,7 @@ homepage = "https://github.com/ZettaScaleLabs/zenoh-rpc"
 license = " EPL-2.0 OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/ZettaScaleLabs/zenoh-rpc"
-version = "0.8.15"
+version = "0.8.14"
 
 [profile.release]
 codegen-units = 1
@@ -60,11 +60,11 @@ tokio = { version = "1.35.1", default-features = false, features = [
   "time",
 ] }
 tracing = "0.1"
-zenoh = { version = "1.7.2", default-features = false }
-zenoh-codec = { version = "1.7.2" }
-zenoh-core = { version = "1.7.2" }
-zenoh-ext = { version = "1.7.2" }
-zenoh-macros = { version = "1.7.2" }
-zenoh-protocol = { version = "1.7.2" }
-zenoh-util = { version = "1.7.2" }
-zrpc = { version = "0.8.15", path = "./zrpc" }
+zenoh = { version = "1.7.1", default-features = false }
+zenoh-codec = { version = "1.7.1" }
+zenoh-core = { version = "1.7.1" }
+zenoh-ext = { version = "1.7.1" }
+zenoh-macros = { version = "1.7.1" }
+zenoh-protocol = { version = "1.7.1" }
+zenoh-util = { version = "1.7.1" }
+zrpc = { version = "0.8.14", path = "./zrpc" }
